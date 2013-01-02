@@ -1,0 +1,340 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+<head>
+<link rel="Stylesheet" type="text/css" href="cludg.css"/>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"/>
+<title>
+dgesvd</title>
+</head>
+<body>
+<div id="navbar">
+<table cellspacing="0" cellpadding="0" border="0" style="width: 100%;">
+<colgroup span="3">
+<col width="0*"/>
+<col width="0*"/>
+<col width="1*"/>
+</colgroup>
+<tr>
+<td align="left" valign="baseline">
+<a href="mac-fft.html">
+Prev:&nbsp;mac-fft.lisp</a>
+<br/>
+<a href="locate.html">
+Next:&nbsp;locate.lisp</a>
+</td>
+<td>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+<td align="left" valign="baseline">
+<span class="upchain">
+<b>
+dgesvd.lisp</b>
+<br/>
+<a href="index.html">
+Table of Contents</a>
+</span>
+&nbsp;&nbsp;&nbsp;&nbsp;</td>
+</tr>
+</table>
+</div>
+<div class="cludg-doc-body">
+<h2>
+dgesvd.lisp
+</h2>
+<table style="width: 100%;" class="external-summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="3">
+External symbol summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12446">
+vectorized-math:dgesvd</a>
+</td>
+<td class="summary">
+arr</td>
+<td class="summary-type">
+Function</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12447">
+vectorized-math:dgesvd-bksb</a>
+</td>
+<td class="summary">
+u-mat w-vec vt-mat b-vec <em>&amp;key</em> (tolerance 1.0D-8)</td>
+<td class="summary-type">
+Function</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12449">
+vectorized-math:dgesvd-predict</a>
+</td>
+<td class="summary">
+vec xvec ndim npred ll hh <em>&amp;key</em> (tolerance 1.0D-8)</td>
+<td class="summary-type">
+Function</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12448">
+vectorized-math:dgesvd-solve</a>
+</td>
+<td class="summary">
+arr vec <em>&amp;key</em> (tolerance 1.0D-8)</td>
+<td class="summary-type">
+Function</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Variable summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12443">
+*dgesvd-library*</a>
+</td>
+<td class="summary">
+(translate-logical-pathname &quot;PROJECTS:DYLIB;libLispNrUtil.dylib&quot;)</td>
+</tr>
+</table>
+<table style="width: 100%;" class="summary-table">
+<tr class="table-heading-color">
+<th class="summary" colspan="2">
+Function summary</th>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12445">
+blit-c-to-lisp</a>
+</td>
+<td class="summary">
+c-vec l-vec nel</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12444">
+blit-lisp-to-c</a>
+</td>
+<td class="summary">
+l-vec c-vec nel</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12446">
+dgesvd</a>
+</td>
+<td class="summary">
+arr</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12447">
+dgesvd-bksb</a>
+</td>
+<td class="summary">
+u-mat w-vec vt-mat b-vec <em>&amp;key</em> (tolerance 1.0D-8)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12449">
+dgesvd-predict</a>
+</td>
+<td class="summary">
+vec xvec ndim npred ll hh <em>&amp;key</em> (tolerance 1.0D-8)</td>
+</tr>
+<tr class="table-row-color">
+<td class="summary-name">
+<a href="dgesvd.html#_g12448">
+dgesvd-solve</a>
+</td>
+<td class="summary">
+arr vec <em>&amp;key</em> (tolerance 1.0D-8)</td>
+</tr>
+</table>
+<div class="defparam">
+<div class="defunsignatures">
+<a id="_g12443">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+*dgesvd-library*&nbsp;&nbsp;</td>
+<td class="lambda-list">
+</td>
+<td class="symbol-type">
+&nbsp;[Variable]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-package">
+Package: VECTORIZED-MATH</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g12445">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+blit-c-to-lisp&nbsp;&nbsp;</td>
+<td class="lambda-list">
+c-vec l-vec nel</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-package">
+Package: VECTORIZED-MATH</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g12444">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+blit-lisp-to-c&nbsp;&nbsp;</td>
+<td class="lambda-list">
+l-vec c-vec nel</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-package">
+Package: VECTORIZED-MATH</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g12446">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+dgesvd&nbsp;&nbsp;</td>
+<td class="lambda-list">
+arr</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-package">
+Package: VECTORIZED-MATH</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g12447">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+dgesvd-bksb&nbsp;&nbsp;</td>
+<td class="lambda-list">
+u-mat w-vec vt-mat b-vec <em>&amp;key</em> (tolerance 1.0D-8)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-package">
+Package: VECTORIZED-MATH</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g12449">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+dgesvd-predict&nbsp;&nbsp;</td>
+<td class="lambda-list">
+vec xvec ndim npred ll hh <em>&amp;key</em> (tolerance 1.0D-8)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-package">
+Package: VECTORIZED-MATH</div>
+</div>
+<div class="defun">
+<div class="defunsignatures">
+<a id="_g12448">
+</a>
+<table cellpadding="0" cellspacing="0" width="100%">
+<colgroup span="3">
+<col width="0*"/>
+<col width="1*"/>
+<col width="0*"/>
+</colgroup>
+<tbody>
+<tr>
+<td class="symbol-name">
+dgesvd-solve&nbsp;&nbsp;</td>
+<td class="lambda-list">
+arr vec <em>&amp;key</em> (tolerance 1.0D-8)</td>
+<td class="symbol-type">
+&nbsp;[Function]</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="doc-package">
+Package: VECTORIZED-MATH</div>
+</div>
+</div>
+<div class="cludg-footer">
+Generated by&nbsp;<a href="mailto:ihatchondo@common-lisp.net" lang="en">
+CLDOC</a>
+- 2008-07-24 19:20:41</div>
+</body>
+</html>
