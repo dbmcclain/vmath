@@ -12,8 +12,8 @@
   (fli:register-module :fftlib
                        :real-name
                        (translate-logical-pathname
-                        #+:LISPWORKS-32BIT "PROJECTS:DYLIB;libLispFFT.dylib"
-                        #+:LISPWORKS-64BIT "PROJECTS:DYLIB64;libLispFFT-64.dylib")))
+                        #+:LISPWORKS-32BIT "PROJECTS:DYLIB;liblispfft.dylib"
+                        #+:LISPWORKS-64BIT "PROJECTS:DYLIB64;liblispfft-64.dylib")))
 
 ;; ------------------------------------------------------------
 (fli:define-foreign-function (getfftversionstring
@@ -220,8 +220,8 @@
   (fli:register-module :siglab
                        :real-name
                        (translate-logical-pathname
-                        #+:LISPWORKS-32BIT "PROJECTS:DYLIB;libLispSigLab.dylib"
-                        #+:LISPWORKS-64BIT "PROJECTS:DYLIB64;libLispSigLab-64.dylib")))
+                        #+:LISPWORKS-32BIT "PROJECTS:DYLIB;liblispsiglab.dylib"
+                        #+:LISPWORKS-64BIT "PROJECTS:DYLIB64;liblispsiglab-64.dylib")))
 
 (fli:define-foreign-function (disable-denormals
                               "siglab_disable_denormals"

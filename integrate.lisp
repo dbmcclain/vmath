@@ -51,6 +51,11 @@
   (dotimes (ix 10)
     (print (trapm #'inv-exp 0d0 1d0 state))))
 
+
+(trapm (lambda (x) (expt x 2)) 1d0 2d0)
+
+(trapm (lambda (x) x) 0d0 1d0)
+
 |#
 ;; ---------------------------------------------------------------------
 ;; Mid-point Integration with interval tripling
