@@ -9,7 +9,7 @@
 ;;; Handed edited for module linkage - DM/MCFA 12/01
 
 (defvar *plotter-dll*
-  (translate-logical-pathname "PROJECTS:DYLIB;libLispAquaTermPlotter.dylib"))
+  (translate-logical-pathname "PROJECTS:DYLIB;liblispaquatermplotter.dylib"))
 
 (fli:define-c-struct (twindow-setup (:foreign-name "Twindow_setup"))
   (wid     :int)

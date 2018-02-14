@@ -12,7 +12,7 @@
 ;; -----------------------------------------------------------------------
 
 (defparameter *pltstuff-lib*
-  (translate-logical-pathname "PROJECTS:DYLIB;libLispPlotterStuff.dylib"))
+  (translate-logical-pathname "PROJECTS:DYLIB;liblispplotterstuff.dylib"))
 
 (fli:register-module *pltstuff-lib*)
 #|
