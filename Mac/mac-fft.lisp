@@ -340,10 +340,10 @@
                                       :precision ltype)
             (if (eq ctype :double)
                 (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
-                  (let ((twids (get-dtwids nx)))
+                  (with-dtwids (twids nx)
                     (d2zfft nx csrc cdst prtmp pitmp twids)))
               (multiple-value-bind (prtmp pitmp) (get-stmp nx)
-                (let ((twids (get-stwids nx)))
+                (with-stwids (twids nx)
                   (r2cfft nx csrc cdst prtmp pitmp twids)))
               )))
         (funcall finish-fn cdst nx
@@ -427,10 +427,10 @@
             (copy-array-to-complex-cvect arr csrc nx
                                          :precision ltype)
             (if (eq ctype :double)
-                (let ((twids (get-dtwids nx)))
+                (with-dtwids (twids nx)
                   (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
                     (z2dfft nx csrc cdst prtmp pitmp twids)))
-              (let ((twids (get-stwids nx)))
+              (with-stwids (twids nx)
                 (multiple-value-bind (prtmp pitmp) (get-stmp nx)
                   (c2rfft nx csrc cdst prtmp pitmp twids))))
             ))
@@ -498,7 +498,7 @@
       (get-split-temp-array nx 'double-float)
     (declare (type (array double-float (*)) tmp-r tmp-i))
     (d-copy-array-to-split-complex-cvect arr tmp-r roff tmp-i ioff nx nxa)
-    (let ((twids (get-dtwids nx)))
+    (with-dtwids (twids nx)
       (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
         (unsafe-z2zfft nx ptr pti dir prtmp pitmp twids)))
     (d-convert-split-complex-cvect-to-array tmp-r roff tmp-i ioff nx dest)
@@ -539,7 +539,7 @@
       (get-split-temp-array nx 'single-float)
     (declare (type (array single-float (*)) tmp-r tmp-i))
     (s-copy-array-to-split-complex-cvect arr tmp-r roff tmp-i ioff nx nxa)
-    (let ((twids (get-stwids nx)))
+    (with-stwids (twids nx)
       (multiple-value-bind (prtmp pitmp) (get-stmp nx)
         (unsafe-c2cfft nx ptr pti dir prtmp pitmp twids)))
     (s-convert-split-complex-cvect-to-array tmp-r roff tmp-i ioff nx dest)
@@ -563,7 +563,7 @@
                   (eql ltype 'single-float)
                   (eql (array-element-type (fft-buffer-r arr)) 'single-float))
              (let ((dst (setup-dst (or dest arr))))
-               (let ((twids (get-stwids nx)))
+               (with-stwids (twids nx)
                  (multiple-value-bind (prtmp pitmp) (get-stmp nx)
                    (unsafe-c2cfft nx
                                   (fft-buffer-pr dst)
@@ -576,7 +576,7 @@
                   (eql ltype 'double-float)
                   (eql (array-element-type (fft-buffer-r arr)) 'double-float))
              (let ((dst (setup-dst (or dest arr))))
-               (let ((twids (get-dtwids nx)))
+               (with-dtwids (twids nx)
                  (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
                    (unsafe-z2zfft nx
                                   (fft-buffer-pr dst)
@@ -621,13 +621,13 @@
        (nx      (fft-buffer-nx arr)))
     (set-imag arr 0)
     (if (eql type 'single-float)
-        (let ((twids (get-stwids nx)))
+        (with-stwids (twids nx)
           (multiple-value-bind (prtmp pitmp) (get-stmp nx)
             (unsafe-c2cfft
              nx
              ptr pti $fftw-forward
              prtmp pitmp twids)))
-      (let ((twids (get-dtwids nx)))
+      (with-dtwids (twids nx)
         (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
           (unsafe-z2zfft
            nx

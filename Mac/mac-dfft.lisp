@@ -112,40 +112,40 @@
 
 (defun d2z (arr)
   ;; in-place routine
-  (let* ((nx    (fft-buffer-nx arr))
-         (twids (fft:get-dtwids nx)))
-    (multiple-value-bind (prtmp pitmp) (fft:get-dtmp nx)
-      (fill (fft-buffer-i arr) 0d0)
-      (fft:unsafe-z2zfft nx
-                         (fft-buffer-pr  arr)
-                         (fft-buffer-pi  arr)
-                         fft:$fftw-forward
-                         prtmp pitmp twids))
-    ))
+  (let ((nx  (fft-buffer-nx arr)))
+    (fft:with-dtwids (twids nx)
+      (multiple-value-bind (prtmp pitmp) (fft:get-dtmp nx)
+        (fill (fft-buffer-i arr) 0d0)
+        (fft:unsafe-z2zfft nx
+                           (fft-buffer-pr  arr)
+                           (fft-buffer-pi  arr)
+                           fft:$fftw-forward
+                           prtmp pitmp twids))
+      )))
 
 (defun z2d (arr)
   ;; in-place routine
-  (let* ((nx    (fft-buffer-nx arr))
-         (twids (fft:get-dtwids nx)))
-    (multiple-value-bind (prtmp pitmp) (fft:get-dtmp nx)
-      (fft:unsafe-z2zfft nx
-                         (fft-buffer-pr  arr)
-                         (fft-buffer-pi  arr)
-                         fft:$fftw-inverse
-                         prtmp pitmp twids))
-    ))
+  (let ((nx  (fft-buffer-nx arr)))
+    (fft:with-dtwids (twids nx)
+      (multiple-value-bind (prtmp pitmp) (fft:get-dtmp nx)
+        (fft:unsafe-z2zfft nx
+                           (fft-buffer-pr  arr)
+                           (fft-buffer-pi  arr)
+                           fft:$fftw-inverse
+                           prtmp pitmp twids))
+      )))
 
 (defun z2z (arr dir)
   ;; in-place-routine
-  (let* ((nx    (fft-buffer-nx arr))
-         (twids (fft:get-dtwids nx)))
-    (multiple-value-bind (prtmp pitmp) (fft:get-dtmp nx)
-      (fft:unsafe-z2zfft nx
-                         (fft-buffer-pr  arr)
-                         (fft-buffer-pi  arr)
-                         dir
-                         prtmp pitmp twids))
-    ))
+  (let ((nx  (fft-buffer-nx arr)))
+    (fft:with-dtwids (twids nx)
+      (multiple-value-bind (prtmp pitmp) (fft:get-dtmp nx)
+        (fft:unsafe-z2zfft nx
+                           (fft-buffer-pr  arr)
+                           (fft-buffer-pi  arr)
+                           dir
+                           prtmp pitmp twids))
+      )))
 
 ;; --------------------------------------------------------------
 
@@ -179,12 +179,12 @@
        (dst     (or dest (fft-buffer-hr arr)))
        (:declare (type (array double-float (*)) dst)))
     (set-imag arr 0d0)
-    (let* ((nx    (fft-buffer-nx arr))
-           (twids (fft:get-dtwids nx)))
-      (multiple-value-bind (prtmp pitmp) (fft:get-dtmp nx)
-        (fft:unsafe-c2cfft nx
-                           ptr pti fft:$fftw-forward
-                           prtmp pitmp twids)))
+    (let ((nx  (fft-buffer-nx arr)))
+      (fft:with-dtwids (twids nx)
+        (multiple-value-bind (prtmp pitmp) (fft:get-dtmp nx)
+          (fft:unsafe-c2cfft nx
+                             ptr pti fft:$fftw-forward
+                             prtmp pitmp twids))))
     (dotimes (ix (length dst))
       (declare (type fixnum ix))
       (setf (aref dst ix) (funcall after-fn

@@ -4,106 +4,75 @@
 ;; --------------------------------------------------------------
 
 (defvar *twids-lock*  (mp:make-lock))
-(defvar *ka-queue*    nil)
-
-(defvar *stwids*
-  (make-array 22
-              :initial-element nil
-              :adjustable t
-              :weak t))
-
-(defvar *dtwids*
-  (make-array 22
-              :initial-element nil
-              :adjustable t
-              :weak t))
-
-(defstruct twids
-  psetup)
-
-(defstruct (stwids
-            (:include twids)
-            (:constructor stwids (psetup))
-            ))
-(defstruct (dtwids
-            (:include twids)
-            (:constructor dtwids (psetup))
-            ))
-
-(defun free-twids (obj)
-  (cond
-   ((stwids-p obj)
-    (mp:with-lock (*twids-lock*)
-      (cond ((assoc obj *ka-queue*)
-             (hcl:flag-special-free-action obj))
-            (t
-             (nsubstitute nil obj *stwids*)
-             (mp:funcall-async #'destroy-fft-setup (stwids-psetup obj)))
-            )))
-
-   ((dtwids-p obj)
-    (mp:with-lock (*twids-lock*)
-      (cond ((assoc obj *ka-queue*)
-             (hcl:flag-special-free-action obj))
-            (t
-             (nsubstitute nil obj *dtwids*)
-             (mp:funcall-async #'destroy-fft-setupD (dtwids-psetup obj)))
-            )))
-   ))
-(hcl:add-special-free-action 'free-twids)
-
-;; -------------------------------------------------------
-;; Keep-Alive Queue... keep a reference on a TWIDS for 30 sec before
-;; turning over to GC
-
+(defvar *twids*       nil)
 (defvar *twids-timer* nil)
 
+(defstruct twids
+  expir
+  refct
+  prec
+  log2n
+  psetup)
+
 (defun scan-twids ()
-  (mp:with-lock (*twids-lock*)
-    (let ((expiration (- (get-universal-time) 30)))
-      (if (um:deletef-if *ka-queue* (lambda (pair)
-                                      (> expiration (cdr pair))))
-          (mp:schedule-timer-relative *twids-timer* 30)
-        (setf *twids-timer* nil))
-      )))
-
-(defun mark-twids (twids)
-  (let ((pair (assoc twids *ka-queue*)))
-    (if pair
-        (setf (cdr pair) (get-universal-time))
-      (um:aconsf *ka-queue* twids (get-universal-time)))
-    (unless *twids-timer*
-      (setf *twids-timer* (mp:make-timer #'mp:funcall-async #'scan-twids))
-      (mp:schedule-timer-relative *twids-timer* 31))
-    ))
-                   
-;; ---------------------------------------------------
-
-(defun get-twids (nx cache create-fn)
-  (let ((lg2nx (um:ceiling-log2 nx)))
-    (assert (and (>= lg2nx 3)
-                 (<= lg2nx 24)))
+  (let ((now (get-universal-time)))
     (mp:with-lock (*twids-lock*)
-      (let* ((slot  (- lg2nx 3))
-             (twids (or (find-if #'identity cache :start slot)
-                        (let ((twids (funcall create-fn lg2nx)))
-                          (hcl:flag-special-free-action twids)
-                          (setf (aref cache slot) twids))
-                        )))
-        (mark-twids twids)
-        (twids-psetup twids)))))
+      (if (um:deletef-if *twids* (lambda (twids)
+                                   (when (and (zerop (twids-refct twids))
+                                              (> now (twids-expir twids)))
+                                     (if (eql (twids-prec twids) 'double-float)
+                                         (destroy-fft-setupD (twids-psetup twids))
+                                       (destroy-fft-setup (twids-psetup twids)))
+                                     t)))
+          (mp:schedule-timer-relative *twids-timer* 10)
+        (setf *twids-timer* nil)))
+    ))
+
+(defun get-twids (nx prec)
+  (let ((log2nx (um:ceiling-log2 nx)))
+    (assert (<= 3 log2nx 24))
+    (mp:with-lock (*twids-lock*)
+      (let ((twids (find-if (lambda (twids)
+                              (and (eql prec (twids-prec twids))
+                                   (>= (twids-log2n twids) log2nx)))
+                            *twids*)))
+        (unless twids
+          (setf twids (make-twids
+                       :refct  0
+                       :prec   prec
+                       :log2n  log2nx
+                       :psetup (if (eql prec 'double-float)
+                                   (create-fft-setupD log2nx)
+                                 (create-fft-setup log2nx))))
+          (push twids *twids*))
+        (setf (twids-expir twids) (+ (get-universal-time) 30))
+        (sys:atomic-fixnum-incf (twids-refct twids))
+        (unless *twids-timer*
+          (setf *twids-timer* (mp:make-timer #'mp:funcall-async #'scan-twids))
+          (mp:schedule-timer-relative *twids-timer* 11))
+        twids))
+    ))
 
 (defun get-stwids (nx)
-  (get-twids nx *stwids*
-             (lambda (lg2nx)
-               (stwids (create-fft-setup lg2nx)))
-             ))
+  ;; called by FFT routines
+  (get-twids nx 'single-float))
 
 (defun get-dtwids (nx)
-  (get-twids nx *dtwids*
-             (lambda (lg2nx)
-               (dtwids (create-fft-setupD lg2nx)))
-             ))
+  ;; called by FFT routines
+  (get-twids nx 'double-float))
+
+(defmacro with-stwids ((stwids nx) &body body)
+  `(do-with-twids (get-stwids ,nx) (lambda (,stwids)
+                                     ,@body)))
+
+(defmacro with-dtwids ((dtwids nx) &body body)
+  `(do-with-twids (get-dtwids ,nx) (lambda (,dtwids)
+                                     ,@body)))
+
+(defun do-with-twids (twids fn)
+  (unwind-protect
+      (funcall fn (twids-psetup twids))
+    (sys:atomic-fixnum-decf (twids-refct twids))))
 
 ;; ---------------------------------------------------------------------
 

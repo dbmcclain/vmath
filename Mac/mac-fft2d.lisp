@@ -386,10 +386,10 @@
                 (copy-array-to-real-cvect arr csrc ny nx
                                           :precision ltype)
                 (if (eq ctype :double)
-                    (let ((twids (fft:get-dtwids maxdim)))
+                    (fft:with-dtwids (twids maxdim)
                       (multiple-value-bind (prtmp pitmp) (fft:get-dtmp maxbuf)
                         (fft:d2zfft2d nx ny csrc cdst prtmp pitmp twids)))
-                  (let ((twids (fft:get-stwids maxdim)))
+                  (fft:with-stwids (twids maxdim)
                     (multiple-value-bind (prtmp pitmp) (fft:get-stmp maxbuf)
                       (fft:r2cfft2d nx ny csrc cdst prtmp pitmp twids))))
                 ))
@@ -481,10 +481,10 @@
                 (copy-array-to-complex-cvect arr csrc ny nx
                                              :precision ltype)
                 (if (eq ctype :double)
-                    (let ((twids (fft:get-dtwids maxdim)))
+                    (fft:with-dtwids (twids maxdim)
                       (multiple-value-bind (prtmp pitmp) (fft:get-dtmp maxbuf)
                         (fft:z2dfft2d nx ny csrc cdst prtmp pitmp twids)))
-                  (let ((twids (fft:get-stwids maxdim)))
+                  (fft:with-stwids (twids maxdim)
                     (multiple-value-bind (prtmp pitmp) (fft:get-stmp maxbuf)
                       (fft:c2rfft2d nx ny csrc cdst prtmp pitmp twids))))
                 ))
@@ -590,7 +590,7 @@
       ((:values (tmp-r roff ptr tmp-i ioff pti) (get-split-temp-array-2D ny nx 'double-float))
        (:declare (type (array double-float (*)) tmp-r tmp-i)))
     (d-copy-array-to-split-complex-cvect arr tmp-r roff tmp-i ioff ny nx nya nxa)
-    (let ((twids (fft:get-dtwids (max nx ny))))
+    (fft:with-dtwids (twids (max nx ny))
       (multiple-value-bind (prtmp pitmp) (fft:get-dtmp (* nx ny))
         (fft:unsafe-z2zfft2d nx ny ptr pti dir prtmp pitmp twids)))
     (d-convert-split-complex-cvect-to-array tmp-r roff tmp-i ioff ny nx dest)
@@ -649,7 +649,7 @@
       ((:values (tmp-r roff ptr tmp-i ioff pti) (get-split-temp-array-2D ny nx 'single-float))
        (:declare (type (array single-float (*)) tmp-r tmp-i)))
     (s-copy-array-to-split-complex-cvect arr tmp-r roff tmp-i ioff ny nx nya nxa)
-    (let ((twids (fft:get-stwids (max nx ny))))
+    (fft:with-stwids (twids (max nx ny))
       (multiple-value-bind (prtmp pitmp) (fft:get-stmp (* nx ny))
         (fft:unsafe-c2cfft2d nx ny ptr pti dir prtmp pitmp twids)))
     (s-convert-split-complex-cvect-to-array tmp-r roff tmp-i ioff ny nx dest)
@@ -671,7 +671,7 @@
                   (eql ltype 'single-float)
                   (eql (array-element-type (fft-buffer-r arr)) 'single-float))
              (let ((dst (setup-dst (or dest arr))))
-               (let ((twids  (fft:get-stwids (max nx ny))))
+               (fft:with-stwids (twids (max nx ny))
                  (multiple-value-bind (prtmp pitmp) (fft:get-stmp (* nx ny))
                    (fft:unsafe-c2cfft2d nx ny
                                         (fft-buffer-pr dst)
@@ -684,7 +684,7 @@
                 (eql ltype 'double-float)
                 (eql (array-element-type (fft-buffer-r arr)) 'double-float))
            (let ((dst (setup-dst (or dest arr))))
-             (let ((twids  (fft:get-dtwids (max nx ny))))
+             (fft:with-dtwids (twids (max nx ny))
                (multiple-value-bind (prtmp pitmp) (fft:get-dtmp (* nx ny))
                  (fft:unsafe-z2zfft2d nx ny
                                       (fft-buffer-pr dst)
@@ -733,13 +733,13 @@
            (maxbuf (* nx ny)))
       (set-imag arr 0)
       (if (eql type 'single-float)
-          (let ((twids (fft:get-stwids maxdim)))
+          (fft:with-stwids (twids maxdim)
             (multiple-value-bind (prtmp pitmp) (fft:get-stmp maxbuf)
               (fft:unsafe-c2cfft2d
                  nx ny
                  ptr pti fft:$fftw-forward
                  prtmp pitmp twids)))
-          (let ((twids (fft:get-dtwids maxdim)))
+          (fft:with-dtwids (twids maxdim)
             (multiple-value-bind (prtmp pitmp) (fft:get-dtmp maxbuf)
               (fft:unsafe-z2zfft2d
                  nx ny

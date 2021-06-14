@@ -94,8 +94,8 @@
    #:symmetric-replace
    #:center-implant
 
-   #:get-stwids
-   #:get-dtwids
+   #:with-stwids
+   #:with-dtwids
    #:get-process-split-tmp
    #:get-stmp
    #:get-dtmp
