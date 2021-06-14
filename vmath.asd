@@ -15,11 +15,16 @@
                 (:file "interpolate")
                 (:file "monotonic-spline")
                 (:file "integrate")
+                (:file "roots")
+                (:file "fft-tools")
+                (:file "kaiser")
+                (:file "simplex")
                 
                 #+:MACOSX
                 (:MODULE "Mac"
                  :COMPONENTS ((:file "mac_fft_intf")
-                              (:file "mac-fft" :depends-on ("mac_fft_intf"))
+                              (:file "fft-twids" :depends-on ("mac_fft_intf"))
+                              (:file "mac-fft"   :depends-on ("mac_fft_intf"))
                               (:file "mac-sfft")
                               (:file "mac-dfft")
                               (:file "mac-fft2d")
@@ -29,7 +34,9 @@
                 (:MODULE "Win"
                  :components ((:file "win_fft_intf")
                               (:file "win-fft"  :depends-on ("win_fft_intf"))))
-                
+
+                (:file "nr-glue")
+                #+:MACOSX (:file "burg")
                 #+:MACOSX (:file "dgesvd"))
   :serial t
   :depends-on  ("data-objects"

@@ -7,7 +7,7 @@
 ;; set the colormap to grays
 (defun init-colormap ()
   (let ((r (vm:iramp 256)))
-    (sg:set-cmap r r r)))
+    (plt:set-cmap r r r)))
 
 (topgui:define-toplevel-app-interface interface-1 ()
   ((image  :accessor interface-image :initform nil))
@@ -18,7 +18,23 @@
     :accessor image-display
     :cursor :crosshair
     :input-model
-    '((#\control-\c    copy-to-clipboard)
+    '(
+      ("Control-c"    copy-to-clipboard)
+      ("Left"          move-left 1)
+      ("Right"         move-right 1)
+      ("Up"            move-up 1)
+      ("Down"          move-down 1)
+      ("Control-left"  move-left 10)
+      ("Control-right" move-right 10)
+      ("Control-up"    move-up 10)
+      ("Control-down"  move-down 10)
+      (#\z             set-ref-magnitude-from-kbd)
+      (:motion         show-position)
+      ((:button-3 :press)     set-ref-magnitude)
+      ;((:button-1 :motion)   redraw-crosshairs)
+      ;((:button-1 :release)  undraw-crosshairs)
+      #|
+      (#\control-\c    copy-to-clipboard)
       (#\left          move-left 1)
       (#\right         move-right 1)
       (#\up            move-up 1)
@@ -32,6 +48,7 @@
       ((:button-3 :press)     set-ref-magnitude)
       ;((:button-1 :motion)   redraw-crosshairs)
       ;((:button-1 :release)  undraw-crosshairs)
+      |#
       )
     :display-callback 'redisplay-image
     :min-width 640
@@ -211,8 +228,9 @@
   (declare (ignore data))
   (capi:destroy intf))
 
+#|
 (defvar *bullseye-cursor*
-  (lazy:make (sg:load-cursor-from-file "bullseye.cur")))
+  (lazy:make (plt:load-cursor-from-file "bullseye.cur")))
 
 (defun photom ()
   (labels
@@ -221,14 +239,23 @@
                 (let* ((pane (image-display intf))
                        (repr (slot-value pane 'capi-internals:representation)))
                   (setf (slot-value repr 'capi-win32-lib::cursor)
-                        (lazy:force *bullseye-cursor*)))
+                        #|(lazy:force *bullseye-cursor*)|#
+                        :cross))
                 ))
     (topgui:run-toplevel-app-interface 'interface-1
                                        :after #'startup)))
+|#
 
+(defun photom ()
+  (labels
+      ((startup (intf)
+                (init-colormap)
+                ))
+    (topgui:run-toplevel-app-interface 'interface-1
+                                       :after #'startup)))
 (defun copy-to-clipboard (&rest args)
   (declare (ignore args))
-  (sg:copy-graphic-to-clipboard)
+  (plt:copy-graphic-to-clipboard)
   (capi:display-message "image captured"))
 
 (defclass <image-array-x> ()
@@ -408,13 +435,13 @@
 
 (defun redraw-color-bar (pane &rest args)
   (declare (ignore args))
-  (sg:direct-redraw pane))
+  (plt:direct-redraw pane))
 
 (defun draw-color-bar (intf)
   (let ((wpane (color-bar-display intf)))
-    (sg:wset wpane)
+    (plt:wset wpane)
     (let ((neg-img (capi:button-selected (neg-button intf))))
-      (sg:tvscl *color-bar* :neg neg-img))
+      (plt:tvscl *color-bar* :neg neg-img))
     ))
 
 (defvar *magnification*  2)
@@ -425,8 +452,8 @@
         (range-pane      (range-slider intf))
         (negate-button   (neg-button intf))
         (logscale-button (logscale-button intf)))
-    (sg:wset wpane)
-    (sg:werase sg:$black)
+    (plt:window wpane)
+    (plt:clear  wpane)
     (let* ((display-min (capi:range-slug-start offs-pane))
            (display-max (+ display-min
                            (capi:range-slug-start range-pane)))
@@ -467,14 +494,14 @@
             (setf (fli:dereference pdst :index ix)
                   (funcall fn (fli:dereference psrc :index ix))))
           ))
-      (sg:tvscl ximg
+      (plt:tvscl ximg
                 :range (list 0 (funcall fn maxv))
                 :magn  *magnification*
                 :neg   neg))
     ))
 
 (defun show-linear-stretch (img minv maxv neg)
-  (sg:tvscl (image-array-arena img)
+  (plt:tvscl (image-array-arena img)
             :range (list minv maxv)
             :magn  *magnification*
             :neg   neg))
@@ -492,57 +519,56 @@
 
 (defun redisplay-image (pane &rest args)
   (declare (ignore args))
-  (sg:direct-redraw pane))
+  (plt:direct-redraw pane))
 
 (defvar *sub-image*
   ;; allocate once and use over and over again...
   (ca:make-carray :float '(11 11)))
 
-(defun get-subimage-centered (arr ctr)
+(um:defun* get-subimage-centered (arr (ctrx ctry))
   (destructuring-bind (dimy dimx)
       (ca:carray-dimensions arr)
-    (destructuring-bind (ctry ctrx) ctr
-      (let* ((minval (ca:caref arr ctry ctrx))
-             (maxval minval))
-        (declare (type float minval maxval))
-        (if (and (< 4 ctry (- dimy 5))
-                 (< 4 ctrx (- dimx 5)))
-            (loop for iy from (- ctry 5) to (+ ctry 5)
-                  and jy from 0 below 11 do
-                  (loop for ix from (- ctrx 5) to (+ ctrx 5)
-                        and jx from 0 below 11 do
-                        (let ((v (ca:caref arr iy ix)))
-                          (declare (type float v))
-                          (setf minval (min minval v)
-                                maxval (max maxval v))
-                          (setf (ca:caref *sub-image* jy jx) v))))
-          (let ((rpos -1)
-                (rvec #.(make-array 121)))
-            (loop for iy from (- ctry 5) to (+ ctry 5)
-                  and jy from 0 below 11 do
-                  (loop for ix from (- ctrx 5) to (+ ctrx 5)
-                        and jx from 0 below 11 do
-                        (if (and (< -1 iy dimy)
-                                 (< -1 ix dimx))
-                            (let ((v (ca:caref arr iy ix)))
-                              (declare (type float v))
-                              (setf minval (min minval v)
-                                    maxval (max maxval v))
-                              (setf (ca:caref *sub-image* jy jx) v))
-                          (let ((pos (+ jx (* 11 jy))))
-                            (setf (aref rvec pos) rpos)
-                            (setf rpos pos)))
-                        ))
-            (ca:with-row-major-access (p *sub-image*)
-              (do ((rpos rpos))
-                  ((minusp rpos))
-                (let ((rpos2 (aref rvec rpos)))
-                  (setf (fli:dereference p :index rpos) minval)
-                  (setf rpos rpos2))
-                ))
-            ))
-        (values *sub-image* minval maxval)
-        ))))
+    (let* ((minval (ca:caref arr ctry ctrx))
+           (maxval minval))
+      (declare (type float minval maxval))
+      (if (and (< 4 ctry (- dimy 5))
+               (< 4 ctrx (- dimx 5)))
+          (loop for iy from (- ctry 5) to (+ ctry 5)
+                and jy from 0 below 11 do
+                (loop for ix from (- ctrx 5) to (+ ctrx 5)
+                      and jx from 0 below 11 do
+                      (let ((v (ca:caref arr iy ix)))
+                        (declare (type float v))
+                        (setf minval (min minval v)
+                              maxval (max maxval v))
+                        (setf (ca:caref *sub-image* jy jx) v))))
+        (let ((rpos -1)
+              (rvec #.(make-array 121)))
+          (loop for iy from (- ctry 5) to (+ ctry 5)
+                and jy from 0 below 11 do
+                (loop for ix from (- ctrx 5) to (+ ctrx 5)
+                      and jx from 0 below 11 do
+                      (if (and (< -1 iy dimy)
+                               (< -1 ix dimx))
+                          (let ((v (ca:caref arr iy ix)))
+                            (declare (type float v))
+                            (setf minval (min minval v)
+                                  maxval (max maxval v))
+                            (setf (ca:caref *sub-image* jy jx) v))
+                        (let ((pos (+ jx (* 11 jy))))
+                          (setf (aref rvec pos) rpos)
+                          (setf rpos pos)))
+                      ))
+          (ca:with-row-major-access (p *sub-image*)
+            (do ((rpos rpos))
+                ((minusp rpos))
+              (let ((rpos2 (aref rvec rpos)))
+                (setf (fli:dereference p :index rpos) minval)
+                (setf rpos rpos2))
+              ))
+          ))
+      (values *sub-image* minval maxval)
+      )))
           
 (defun show-magnified-selection (intf img x y #|med|# )
   (let* ((pane  (magn-image-display intf))
@@ -551,8 +577,8 @@
 	 (neg-img     (capi:button-selected negate-button)))
     (multiple-value-bind (ximg minval maxval)
         (get-subimage-centered arr (list y x))
-      (sg:wset pane)
-      (sg:tvscl ximg
+      (plt:wset pane)
+      (plt:tvscl ximg
                 :magn  8
                 :range (list minval
                              (max (ca:caref ximg 5 5) ;; pick out ctr pixel
@@ -562,7 +588,7 @@
 
 (defun draw-magn-frame-fiducials (pane x y width height)
   (declare (ignore x y width height))
-  (sg:direct-redraw pane)
+  (plt:direct-redraw pane)
   (gp:with-graphics-state (pane :operation boole-1
                                 :foreground :red)
     (gp:draw-line pane 0 43 38 43)
@@ -593,23 +619,21 @@
       (let* ((moat (let ((cnt 0))
                      (if (and (< 19 ctry (- dimy 20))
                               (< 19 ctrx (- dimx 20)))
-                         (loop for loc in *wmask* do
-                               (destructuring-bind (iy ix) loc
-                                 (let ((ypos (+ iy ctry))
-                                       (xpos (+ ix ctrx)))
-                                   (setf (aref *moat* cnt)
-                                         (ca:caref arr ypos xpos))
-                                   (incf cnt))))
-                       (loop for loc in *wmask* do
-                             (destructuring-bind (iy ix) loc
+                         (loop for (iy ix) in *wmask* do
                                (let ((ypos (+ iy ctry))
                                      (xpos (+ ix ctrx)))
-                                 (when (and (< -1 ypos dimy)
-                                            (< -1 xpos dimx))
-                                   (setf (aref *moat* cnt)
-                                         (ca:caref arr ypos xpos))
-                                   (incf cnt))
-                                 ))))
+                                 (setf (aref *moat* cnt)
+                                       (ca:caref arr ypos xpos))
+                                 (incf cnt)))
+                       (loop for (iy ix) in *wmask* do
+                             (let ((ypos (+ iy ctry))
+                                   (xpos (+ ix ctrx)))
+                               (when (and (< -1 ypos dimy)
+                                          (< -1 xpos dimx))
+                                 (setf (aref *moat* cnt)
+                                       (ca:caref arr ypos xpos))
+                                 (incf cnt))
+                               )))
                      (make-array cnt
                                  :displaced-to *moat*
                                  :element-type 'float)))

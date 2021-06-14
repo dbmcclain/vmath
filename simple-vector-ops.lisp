@@ -1,5 +1,5 @@
 
-(in-package vector-ops)
+(in-package :vector-ops)
 
 ;; --------------------------------------------------------
 ;; Vector Routines
@@ -119,3 +119,48 @@
 (destructure-vector (a b &rest others) vec-expr my-body)
 (destructure-vector (a b . c) vec-expr my-body)
 |#
+
+(defun vlimit> (v lim>)
+  (map 'vector (um:curry #'max lim>) v))
+
+(defun vlimit< (v lim<)
+  (map 'vector (um:curry #'min lim<) v))
+
+(defun clip (x lim< lim>)
+  (let ((vmax (max lim< lim>))
+        (vmin (min lim< lim>)))
+    (max vmin (min vmax x))))
+
+(defun vclip (v lim< lim>)
+  (let ((vmax (max lim< lim>))
+        (vmin (min lim< lim>)))
+    (map 'vector (um:compose (um:curry #'min vmax)
+                             (um:curry #'max vmin))
+         v)))
+
+(defun wrap (x lim< lim>)
+  (let* ((vmax (max lim< lim>))
+         (vmin (min lim< lim>))
+         (diff (- vmax vmin)))
+    (+ vmin (mod (- x vmin) diff))))
+
+(defun vwrap (v lim< lim>)
+  (let* ((vmax (max lim< lim>))
+         (vmin (min lim< lim>))
+         (diff (- vmax vmin)))
+    (map 'vector (lambda (x)
+                   (+ vmin (mod (- x vmin) diff)))
+         v)))
+
+(defun extrema (&rest args)
+  (values (apply #'min args)
+          (apply #'max args)))
+
+(defun vextrema (v)
+  (let* ((vmin  (aref v 0))
+         (vmax  vmin))
+    (map nil (lambda (x)
+               (setf vmin (min vmin x)
+                     vmax (max vmax x)))
+         v)
+    (values vmin vmax)))

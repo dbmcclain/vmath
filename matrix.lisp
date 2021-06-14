@@ -17,7 +17,9 @@
    #:asin  #:acos  #:atan
    #:sinh  #:cosh  #:tanh
    #:asinh #:acosh #:atanh
-   #:exp   #:log)
+   #:exp   #:log
+   #:floor #:ceiling #:round #:truncate
+   )
   (:export
    #:matrix
    #:make-matrix
@@ -51,6 +53,11 @@
    #:inv
    #:cholsl
    #:msolve
+
+   #:floor
+   #:ceiling
+   #:round
+   #:truncate
    
    #:maxabs
    #:sq
@@ -161,11 +168,12 @@
 (defmacro define-unary-operators ()
   `(progn
      ,@(mapcar
-        (lambda (pair)
-         (destructuring-bind (name op) pair
-           `(defunop ,name ,op)))
+        (um:lambda* ((name op))
+          `(defunop ,name ,op))
         '((abs       cl:abs)
           (neg       cl:-)
+          ;; (inv       cl:/)
+          (sq        (lambda (x) (* (conjugate x) x)))
           (sqrt      cl:sqrt)
           (conjugate cl:conjugate)
           (phase     cl:phase)
@@ -182,7 +190,12 @@
           (acosh     cl:acosh)
           (atanh     cl:atanh)
           (exp       cl:exp)
-          (log       cl:log))) ))
+          (log       cl:log)
+          (floor     cl:floor)
+          (ceiling   cl:ceiling)
+          (round     cl:round)
+          (truncate  cl:truncate)
+          )) ))
 
 (define-unary-operators)
 
@@ -218,12 +231,16 @@
 
 ;; -------------------------------------
 
-(defmethod copyi ((v vector) &key (fn #'identity))
+(defun identityi (x &rest ixs)
+  (declare (ignore ixs))
+  x)
+
+(defmethod copyi ((v vector) &key (fn #'identityi))
   (as-vector (loop for x across v
                    for ix from 0
                    collect (funcall fn x ix))))
 
-(defmethod copyi ((m matrix) &key (fn #'identity))
+(defmethod copyi ((m matrix) &key (fn #'identityi))
   (make-matrix
    :rows (as-vector (loop for iy from 0
                           for row across (matrix-rows m)
@@ -233,7 +250,7 @@
                                            collect
                                            (funcall fn v iy ix))) )) ))
 
-(defmethod copyi ((a array) &key (fn #'identity))
+(defmethod copyi ((a array) &key (fn #'identityi))
   (let ((ans   (make-array-like a))
         (nrows (nrows a))
         (ncols (ncols a)))
@@ -249,6 +266,9 @@
 (defmethod + (x m)
   (x+nm m x))
 
+(defmethod + ((x cons) m)
+  (x+c m x)) 
+
 (defmethod + ((v vector) x)
   (x+v x v))
 
@@ -257,7 +277,6 @@
 
 (defmethod + ((a array) x)
   (x+a x a))
-
 
 ;; -------------------------------------
 
@@ -269,11 +288,28 @@
 (defmethod / (a b)
   (a*invb b a))
 
+(defmethod a*invb ((b cons) a)
+  (map 'list (um:curry 'cl:/ a) b))
+
 (defmethod a*invb ((b vector) a)
   (map 'vector (um:curry #'cl:/ a) b))
 
 (defmethod a*invb (b a)
   (* a (inv b)))
+
+
+(defmethod / ((a cons) b)
+  (c/b b a))
+
+(defmethod c/b (b a)
+  (map 'list (um:rcurry 'cl:/ b) a))
+
+(defmethod c/b ((b cons) a)
+  (map 'list 'cl:/ a b))
+
+(defmethod c/b ((b vector) a)
+  (map 'vector 'cl:/ a b))
+
 
 (defmethod / ((a vector) b)
   (v/b b a))
@@ -315,6 +351,9 @@
 (defmethod diag ((a array))
   (diag-m-or-a a))
 
+(defmethod diag ((c cons))
+  (diag (coerce c 'vector)))
+
 (defun diag-m-or-a (m)
   ;; m can be matrix or array
   (copyi m :fn (lambda (v iy ix)
@@ -327,6 +366,9 @@
 
 (defmethod * (x m)
   (x*nm m x))
+
+(defmethod * ((x cons) m)
+  (x*c m x))
 
 (defmethod * ((v vector) x)
   (x*v x v))
@@ -346,6 +388,7 @@
 (defmethod trn ((v vector))
   ;; a vector is a row-vector or a column vector
   ;; depending on local context
+  ;; Generally: Left = row, Right = column
   v)
 
 (defmethod trn ((a array))
@@ -575,6 +618,12 @@
 (defmethod inv (x)
   (cl:/ x))
 
+(defmethod inv ((x cons))
+  (map 'list 'cl:/ x))
+
+(defmethod inv ((x vector))
+  (map 'vector 'cl:/ x))
+
 (defmethod inv ((a array))
   (inv-m-or-a a))
 
@@ -621,9 +670,6 @@
 |#
 
 ;; -------------------------------------
-
-(defun sq (x)
-  (* x x))
 
 (defun choldc (m)
   (let* ((a     (matrix-rows (copy m)))
@@ -738,17 +784,45 @@
 (defmethod x*nm ((m matrix) x)
   (x*ml x m))
 
+;; -----------------------------------------
+;; second arg c, known to be a cons
+
+(defmethod x+c (x c)
+  (map 'list (um:curry 'cl:+ x) c))
+
+(defmethod x+c ((x cons) c)
+  (map 'list 'cl:+ x c))
+
+(defmethod x+c ((x vector) c)
+  (map 'vector 'cl:+ x c))
+
+
+(defmethod x*c (x c)
+  (map 'list (um:curry 'cl:* x) c))
+
+(defmethod x*c ((x cons) c)
+  (map 'list 'cl:* x c))
+
+(defmethod x*c ((x vector) c)
+  (map 'vector 'cl:* x c))
+
 ;; ------------------------------------------
 ;; second arg v, known to be a vector
 
 (defmethod x+v (x v)
   (vops:voffset x v))
 
+(defmethod x+v ((x cons) v)
+  (map 'vector 'cl:+ x v))
+
 (defmethod x+v ((x vector) v)
   (vops:vadd x v))
 
 (defmethod x*v (x v)
   (vops:vscale x v))
+
+(defmethod x*v ((x cons) v)
+  (map 'vector 'cl:* x v))
 
 (defmethod x*v ((x vector) v)
   (vops:vmul x v))

@@ -20,33 +20,33 @@
       (labels ((dely/delx (x1 x2 y1 y2)
                  (/ (- y2 y1) (- x2 x1))))
 
-        (um:nlet-tail iter ((ix    0)
-                            (xprev (aref xs 0))
-                            (yprev (aref ys 0)))
+        (um:nlet iter ((ix    0)
+                       (xprev (aref xs 0))
+                       (yprev (aref ys 0)))
           (let ((ixp1 (1+ ix)))
             (when (< ixp1 nel)
               (let ((xnext (aref xs ixp1))
                     (ynext (aref ys ixp1)))
                 (setf (aref dels ix) (dely/delx xprev xnext yprev ynext))
-                (iter ixp1 xnext ynext)) ))))
+                (go-iter ixp1 xnext ynext)) ))))
 
       ;; compute slopes
       (labels ((avg (a b)
                  (* 0.5d0 (+ a b))))
 
-        (um:nlet-tail iter ((ix   1)
-                            (prev (setf (aref ms 0) (aref dels 0))))
+        (um:nlet iter ((ix   1)
+                       (prev (setf (aref ms 0) (aref dels 0))))
           (if (< ix nelm1)
               ;; midpoint slopes use average of secants
               (let ((next (aref dels ix)))
                 (setf (aref ms ix) (avg prev next))
-                (iter (1+ ix) next))
+                (go-iter (1+ ix) next))
             ;; endpoint slopes use one-sided diffs
             (setf (aref ms ix) prev))))
       
       ;; fixup slopes to preserve monotonicity
-      (um:nlet-tail iter ((ix     0)
-                          (msprev (aref ms 0)))
+      (um:nlet iter ((ix     0)
+                     (msprev (aref ms 0)))
         (let ((ixp1 (1+ ix)))
           (when (< ixp1 nel)
             (let ((delk (aref dels ix)))
@@ -54,7 +54,7 @@
                   (progn
                     (setf (aref ms ix)   0d0
                           (aref ms ixp1) 0d0)
-                    (iter ixp1 0d0))
+                    (go-iter ixp1 0d0))
                 ;; else
                 (let* ((msixp1 (aref ms ixp1))
                        (alpha  (/ msprev delk))
@@ -66,7 +66,7 @@
                       (setf (aref ms ix)   (* tau msprev)
                             msixp1         (* tau msixp1)
                             (aref ms ixp1) msixp1)))
-                  (iter ixp1 msixp1)) )))))
+                  (go-iter ixp1 msixp1)) )))))
       
       (make-instance '<monotonic-spline-data>
                      :xs  xs

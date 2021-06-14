@@ -37,7 +37,7 @@
 (defun make-overlay-vector (arr)
   (if (vectorp arr)
       arr
-    (make-array (size-of arr)
+    (make-array (array-total-size arr)
                 :displaced-to arr
                 :element-type (array-element-type arr))))
 
@@ -241,7 +241,7 @@
                      ;; (debug  0)
                      (float  0)))
   (let ((v (make-array nel
-                       :initial-element 0.0f0
+                       :initial-element 0.0F0
                        :element-type 'single-float)))
     (declare (type (simple-array single-float (*)) v))
     (do ((ix (1- nel) (1- ix)))
@@ -275,11 +275,11 @@
   (let ((v (make-array nel :element-type 'single-float)))
     (declare (type (simple-array single-float (*)) v))
     (do ((ix 0 (1+ ix))
-         (val (- (/ (coerce nel 'float) 2.0))
-              (+ val 1.0)))
+         (val (- (/ (coerce nel 'single-float) 2.0F0))
+              (+ val 1.0F0)))
         ((>= ix nel) v)
       (declare (type fixnum ix)
-               (type float val))
+               (type single-float val))
       (setf (row-major-aref v ix) val))
     ))
 
@@ -294,14 +294,14 @@
                      ;; (debug  0)
                      (float  0)))
   (let ((v (make-array nel :element-type 'single-float))
-        (flimit (coerce limit 'float)))
-    (declare (type float flimit)
+        (flimit (coerce limit 'single-float)))
+    (declare (type single-float flimit)
              (type (simple-array single-float (*)) v))
     (do ((ix (1- nel) (1- ix)))
         ((minusp ix) v)
       (declare (type fixnum ix))
       (setf (row-major-aref v ix) 
-            (the float (lw:mt-random flimit random-state))
+            (the single-float (lw:mt-random flimit random-state))
             ))
     ))
 
@@ -316,28 +316,28 @@
       (let ((ans *v-other*))
 	(setf *v-other* nil)
 	ans)
-    (let ((v1 (- (* 2.0 
-                    (the float (lw:mt-random 1.0 random-state))
-                    ) 1.0))
-          (v2 (- (* 2.0 
-                    (the float (lw:mt-random 1.0 random-state))
-                    ) 1.0)))
-      (declare (type float v1 v2))
+    (let ((v1 (- (* 2.0F0 
+                    (the single-float (lw:mt-random 1.0F0 random-state))
+                    ) 1.0F0))
+          (v2 (- (* 2.0F0 
+                    (the single-float (lw:mt-random 1.0F0 random-state))
+                    ) 1.0F0)))
+      (declare (type single-float v1 v2))
       (let ((r2 (+ (* v1 v1) (* v2 v2))))
-        (declare (type float r2))
+        (declare (type single-float r2))
         (if (and (plusp r2)
-                 (< r2 1.0))
+                 (< r2 1.0F0))
             (let ((fac 
-                   (the float (sqrt (/ (* -2.0 (the float (log r2))) r2)))
+                   (the single-float (sqrt (/ (* -2.0F0 (the single-float (log r2))) r2)))
                    ))
-              (declare (type float fac))
+              (declare (type single-float fac))
               (setf *v-other* (* fac v1))
               (* fac v2))
           (gasdev random-state))
         ))
     ))
 
-(defun gnoise (nel &key (mean 0.0) (sd 1.0) (random-state lw:*mt-random-state*))
+(defun gnoise (nel &key (mean 0.0F0) (sd 1.0F0) (random-state lw:*mt-random-state*))
   (declare (type fixnum nel))
   (declare (special lw:*mt-random-state*))
   (declare (optimize (speed  3)
@@ -345,16 +345,16 @@
                      ;; (debug  0)
                      (float  0)))
   (let ((v (make-array nel :element-type 'single-float))
-        (fmean (coerce mean 'float))
-        (fsd   (coerce sd   'float)))
+        (fmean (coerce mean 'single-float))
+        (fsd   (coerce sd   'single-float)))
     (declare (type (simple-array single-float (*)) v)
-             (type float fmean fsd))
+             (type single-float fmean fsd))
     (do ((ix (1- nel) (1- ix)))
         ((minusp ix) v)
       (declare (type fixnum ix))
       (setf (row-major-aref v ix)
             (+ fmean (* fsd 
-                        (the float (gasdev random-state))
+                        (the single-float (gasdev random-state))
                         ))))
     ))
 
@@ -367,11 +367,11 @@
                      ;; (debug 0)
                      (float  0)))
   (if (zerop x)
-      1.0
-    (let ((fx (coerce x 'float)))
-      (declare (type float fx))
+      1.0F0
+    (let ((fx (coerce x 'single-float)))
+      (declare (type single-float fx))
       (/ 
-       (the float (sin fx)) 
+       (the single-float (sin fx)) 
        fx))))
 
 (defun logabs (x &optional base)
@@ -382,7 +382,7 @@
 (defmethod vector-of (x)
   (make-array 1 :initial-element x))
 
-(defmethod vector-of ((lst cons))
+(defmethod vector-of ((lst list))
   (coerce lst 'vector))
 
 (defmethod vector-of ((v vector))
@@ -485,11 +485,11 @@
   (general-outer-prod #'* arr1 arr2))
 
 (defun fones (nel)
-  (make-array nel :initial-element 1.0
+  (make-array nel :initial-element 1.0F0
               :element-type 'single-float))
 
 (defun fzeros (nel)
-  (make-array nel :initial-element 0.0
+  (make-array nel :initial-element 0.0F0
               :element-type 'single-float))
 
 (defun iones (nel)
@@ -827,11 +827,15 @@
                          :displaced-to proseq
                          :element-type (array-element-type proseq))
              where)))
+
 ;; -----------------------------------------------------------------------
 
 #-:cormanlisp
 (defun negmad (arr)
-  (let* ((med  (median arr))
+  (let* ((vec  (um:row-major-vector arr))
+         (med  (median vec))
+         (npix (remove-if (um:rcurry #'>= med) vec))
+         #|
          (npix (coerce
                 (um:subselect arr
                               (um:where #'plusp
@@ -839,7 +843,9 @@
                                                      (if (< arr med)
                                                          1.0
                                                        0.0))))
-                'vector)))
+                'vector))
+         |#
+         )
     (mad npix (median npix))))
 
 #+:cormanlisp
@@ -850,8 +856,8 @@
                               (where #'plusp
                                         (elementwise (arr)
                                                      (if (< arr med)
-                                                         1.0
-                                                       0.0))))
+                                                         1.0F0
+                                                       0.0F0))))
                 'vector)))
     (mad npix (median npix))))
 

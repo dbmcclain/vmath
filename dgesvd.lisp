@@ -2,9 +2,8 @@
 
 (defvar *dgesvd-library*
   (translate-logical-pathname
-   #+(AND :MAC :LISPWORKS-32BIT) "PROJECTS:DYLIB;libLispNrUtil.dylib"
-   #+(AND :MAC :LISPWORKS-64BIT) "PROJECTS:DYLIB64;libLispNrUtil-64.dylib"
-   #+ :WIN32 "PROJECTS:DYLIB;Lisp_NrUtil.dll"))
+   #+:MAC "PROJECTS:DYLIB;libLispNrUtil.dylib"
+   #+:WIN32 "PROJECTS:DYLIB;Lisp_NrUtil.dll"))
 
 (fli:register-module *dgesvd-library*)
 #|

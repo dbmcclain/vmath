@@ -8,11 +8,7 @@
 ;; ------------------------------------------------------------------
 ;; Show us the FFT Library Version during loading...
 ;;
-(multiple-value-bind (ans str)
-    (getFFTVersionString "")
-  (declare (ignore ans))
-  (print str))
-
+(print (getFFTVersionString ""))
 ;; ------------------------------------------------------------------
 
 (defstruct (fft-buffer
@@ -20,7 +16,9 @@
   nx
   r i
   roff ioff
-  hr)
+  hr
+  siz
+  pr pi)
 
 (defun half-dim (n)
   (1+ (truncate n 2)))
@@ -49,21 +47,41 @@
         ;; offset ioff by another 4 to avoid the Pentium quirk when two buffer addresses differ
         ;; by multiple of 1024 bytes.
         (incf ioff 4)) ;; bump by another 16 (or 32) bytes
-                          
-    (make-fft-buf
-     :nx   nxa
-     :r    rarr
-     :roff roff
-     :i    iarr
-     :ioff ioff
-     :hr   hrarr)
-    ))
+    (let ((ptr  (+ (* roff type-size) (get-c-address rarr)))
+          (pti  (+ (* ioff type-size) (get-c-address iarr))))
+      (assert (zerop (logand 15 ptr)))
+      (assert (zerop (logand 15 pti)))
+      
+      (make-fft-buf
+       :nx   nxa
+       :r    rarr
+       :roff roff
+       :i    iarr
+       :ioff ioff
+       :hr   hrarr
+       :siz  type-size
+       :pr   ptr
+       :pi   pti)
+      )))
+
+#|
+(defun chk-buf (fftbuf)
+  (assert (= (fft-buffer-pr fftbuf)
+             (+ (* (fft-buffer-roff fftbuf)
+                   (fft-buffer-siz  fftbuf))
+                (get-c-address (fft-buffer-r fftbuf)))))
+  (assert (= (fft-buffer-pi fftbuf)
+             (+ (* (fft-buffer-ioff fftbuf)
+                   (fft-buffer-siz  fftbuf))
+                (get-c-address (fft-buffer-i fftbuf)))))
+  )
+|#
 
 (defun get-real (fftbuf)
-  (values (fft-buffer-r fftbuf) (fft-buffer-roff fftbuf)))
+  (values (fft-buffer-r fftbuf) (fft-buffer-roff fftbuf) (fft-buffer-pr fftbuf)))
 
 (defun get-imag (fftbuf)
-  (values (fft-buffer-i fftbuf) (fft-buffer-ioff fftbuf)))
+  (values (fft-buffer-i fftbuf) (fft-buffer-ioff fftbuf) (fft-buffer-pi fftbuf)))
 
 (defmethod set-real (fftbuf (arr vector))
   (replace (fft-buffer-r fftbuf) arr
@@ -106,11 +124,38 @@
 (defmethod effective-array-dimension ((arr fft-buffer))
   (fft-buffer-nx arr))
 
+
+(defun effective-type (type)
+  (cond ((and (consp type)
+              (eql 'complex (car type)))
+         (cadr type))
+        (t
+         type)))
+
+(defmethod effective-array-element-type ((arr vector))
+  (let ((type (array-element-type arr)))
+    (cond ((eql type 't)
+           (effective-type (type-of (aref arr 0))))
+          (t
+           (effective-type type))
+          )))
+
+(defmethod effective-array-element-type ((arr array))
+  (let ((type (array-element-type arr)))
+    (cond ((eql type 't)
+           (effective-type (type-of (row-major-aref arr 0))))
+          (t
+           (effective-type (array-element-type arr)))
+          )))
+
+(defmethod effective-array-element-type ((arr fft-buffer))
+  (effective-type (array-element-type (fft-buffer-r arr))))
+
 (defun effective-ctype (precision)
   (ecase precision
-    ((:float :single :single-float :altivec) 
+    ((:float :single :single-float :altivec single-float) 
      (values :float 'single-float))
-    ((:double :double-float :fftw)
+    ((:double :double-float :fftw double-float)
      (values :double 'double-float))))
 
 (defun vec (arr &key (size (array-total-size arr)) (offset 0))
@@ -175,14 +220,14 @@
 
 (defun db10 (x)
   (if (plusp x)
-      (* 10.0 (log x 10.0))
-    -140.0))
+      (* 10.0D0 (log x 10.0D0))
+    -140.0D0))
 
 (defun dtor (x)
-  (* #. (/ (atan 1 1) 45) x))
+  (* #.(/ pi 180d0) x))
 
 (defun rtod (x)
-  (* #. (/ 45 (atan 1 1)) x))
+  (* #.(/ 180d0 pi) x))
 
 (defun phase-deg (x)
   (rtod (phase x)))
@@ -225,7 +270,7 @@
       (setf (aref rslt rix)
             (let ((c (complex (fli:dereference csrc :index cix)
                               (fli:dereference csrc :index (1+ cix)))))
-              (db10 (realpart (* c (conjugate c))))))
+              (coerce (db10 (realpart (* c (conjugate c)))) precision)))
       )))
 
 (defun convert-complex-cvect-phases-to-array (csrc nx
@@ -278,7 +323,7 @@
 |#
 
 (defun r2c-body (arr finish-fn &key
-                     (precision :single-float)
+                     (precision (effective-array-element-type arr))
                      dest)
   (um:bind*
       ((nx (check-dimension arr))
@@ -294,15 +339,20 @@
             (copy-array-to-real-cvect arr csrc nx
                                       :precision ltype)
             (if (eq ctype :double)
-                (d2zfft nx csrc cdst)
-              (r2cfft nx csrc cdst))))
+                (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
+                  (let ((twids (get-dtwids nx)))
+                    (d2zfft nx csrc cdst prtmp pitmp twids)))
+              (multiple-value-bind (prtmp pitmp) (get-stmp nx)
+                (let ((twids (get-stwids nx)))
+                  (r2cfft nx csrc cdst prtmp pitmp twids)))
+              )))
         (funcall finish-fn cdst nx
                  :dest dest
                  :precision ltype))
       )))
 
 (defun r2c (arr &key
-                (precision :single-float)
+                (precision (effective-array-element-type arr))
                 dest)
   (r2c-body arr #'convert-complex-cvect-to-array
             :precision precision
@@ -361,7 +411,7 @@
 ;; -----------------------------------------------------------
 
 (defun c2r (arr &key
-                (precision :single-float)
+                (precision (effective-array-element-type arr))
                 dest)
   (um:bind*
       ((nx (check-dimension arr))
@@ -377,8 +427,12 @@
             (copy-array-to-complex-cvect arr csrc nx
                                          :precision ltype)
             (if (eq ctype :double)
-                (z2dfft nx csrc cdst)
-              (c2rfft nx csrc cdst))
+                (let ((twids (get-dtwids nx)))
+                  (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
+                    (z2dfft nx csrc cdst prtmp pitmp twids)))
+              (let ((twids (get-stwids nx)))
+                (multiple-value-bind (prtmp pitmp) (get-stmp nx)
+                  (c2rfft nx csrc cdst prtmp pitmp twids))))
             ))
         (convert-real-cvect-to-array cdst nx
                                      :dest dest
@@ -411,27 +465,6 @@
 ;; --------------------------------------------------------------
 ;; fast routines for split-complex FFT requirements
 
-(defvar *split-tmp* nil)
-
-(defun get-split-temp-array (nx type)
-  (let ((tmp *split-tmp*))
-    (unless (and (fft-buffer-p tmp)
-                 (>= (array-total-size (fft-buffer-r tmp)) nx)
-                 (eql type (array-element-type (fft-buffer-r tmp))))
-      (setf tmp (make-fft-buffer nx type)
-            *split-tmp* tmp))
-    (unless (= (fft-buffer-nx tmp) nx)
-      (setf (fft-buffer-nx tmp) nx
-            (fft-buffer-hr tmp) (make-array (half-dim nx)
-                                            :element-type type
-                                            :displaced-to (fft-buffer-r tmp)
-                                            :displaced-index-offset (fft-buffer-roff tmp))))
-    (values (fft-buffer-r tmp) (fft-buffer-roff tmp)
-            (fft-buffer-i tmp) (fft-buffer-ioff tmp))
-    ))
-
-;; --------------------------------------------------------------
-
 (defun d-copy-array-to-split-complex-cvect (arr dst-r roff dst-i ioff nx nxa)
   (declare (optimize (float 0) (safety 0) (speed 3)))
   (declare (type (array double-float (*)) dst-r dst-i))
@@ -461,11 +494,13 @@
 (defun unsafe-z2z (arr dir nx nxa dest)
   (declare (optimize (float 0) (safety 0) (speed 3)))
   (declare (fixnum nx nxa))
-  (um:bind*
-      ((:values (tmp-r roff tmp-i ioff) (get-split-temp-array nx 'double-float))
-       (:declare (type (array double-float (*)) tmp-r tmp-i)))
+  (multiple-value-bind (tmp-r roff ptr tmp-i ioff pti)
+      (get-split-temp-array nx 'double-float)
+    (declare (type (array double-float (*)) tmp-r tmp-i))
     (d-copy-array-to-split-complex-cvect arr tmp-r roff tmp-i ioff nx nxa)
-    (unsafe-z2zfft nx tmp-r roff tmp-i ioff dir)
+    (let ((twids (get-dtwids nx)))
+      (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
+        (unsafe-z2zfft nx ptr pti dir prtmp pitmp twids)))
     (d-convert-split-complex-cvect-to-array tmp-r roff tmp-i ioff nx dest)
     ))
 
@@ -481,8 +516,8 @@
       (setf (aref dst-r (+ ix roff)) (coerce (realpart v) 'single-float)
             (aref dst-i (+ ix ioff)) (coerce (imagpart v) 'single-float))))
   (when (> nx nxa)
-    (fill dst-r 0e0 :start (+ nxa roff))
-    (fill dst-i 0e0 :start (+ nxa ioff))
+    (fill dst-r 0f0 :start (+ nxa roff))
+    (fill dst-i 0f0 :start (+ nxa ioff))
     ))
 
 (defun s-convert-split-complex-cvect-to-array (src-r roff src-i ioff nx dest)
@@ -500,11 +535,13 @@
 (defun unsafe-c2c (arr dir nx nxa dest)
   (declare (optimize (float 0) (safety 0) (speed 3)))
   (declare (fixnum nx nxa))
-  (um:bind*
-      ((:values (tmp-r roff tmp-i ioff) (get-split-temp-array nx 'single-float))
-       (:declare (type (array single-float (*)) tmp-r tmp-i)))
+  (multiple-value-bind (tmp-r roff ptr tmp-i ioff pti)
+      (get-split-temp-array nx 'single-float)
+    (declare (type (array single-float (*)) tmp-r tmp-i))
     (s-copy-array-to-split-complex-cvect arr tmp-r roff tmp-i ioff nx nxa)
-    (unsafe-c2cfft nx tmp-r roff tmp-i ioff dir)
+    (let ((twids (get-stwids nx)))
+      (multiple-value-bind (prtmp pitmp) (get-stmp nx)
+        (unsafe-c2cfft nx ptr pti dir prtmp pitmp twids)))
     (s-convert-split-complex-cvect-to-array tmp-r roff tmp-i ioff nx dest)
     ))
 
@@ -519,52 +556,54 @@
        (:values (ctype ltype) (effective-ctype precision))
        (:declare (ignore ctype)))
     (labels ((setup-dst (dst)
-             (unless (eq dst arr)
-               (copy-fft-buffer-contents arr dst))
-             dst))
+               (unless (eq dst arr)
+                 (copy-fft-buffer-contents arr dst))
+               dst))
       (cond ((and (fft-buffer-p arr)
                   (eql ltype 'single-float)
                   (eql (array-element-type (fft-buffer-r arr)) 'single-float))
              (let ((dst (setup-dst (or dest arr))))
-               (unsafe-c2cfft nxa
-                              (fft-buffer-r dst)
-                              (fft-buffer-roff dst)
-                              (fft-buffer-i dst)
-                              (fft-buffer-ioff dst)
-                              direction)
+               (let ((twids (get-stwids nx)))
+                 (multiple-value-bind (prtmp pitmp) (get-stmp nx)
+                   (unsafe-c2cfft nx
+                                  (fft-buffer-pr dst)
+                                  (fft-buffer-pi dst)
+                                  direction
+                                  prtmp pitmp twids)))
                dst))
-
-          ((and (fft-buffer-p arr)
-                (eql ltype 'double-float)
-                (eql (array-element-type (fft-buffer-r arr)) 'double-float))
-           (let ((dst (setup-dst (or dest arr))))
-               (unsafe-z2zfft nxa
-                              (fft-buffer-r dst)
-                              (fft-buffer-roff dst)
-                              (fft-buffer-i dst)
-                              (fft-buffer-ioff dst)
-                              direction)
+              
+            ((and (fft-buffer-p arr)
+                  (eql ltype 'double-float)
+                  (eql (array-element-type (fft-buffer-r arr)) 'double-float))
+             (let ((dst (setup-dst (or dest arr))))
+               (let ((twids (get-dtwids nx)))
+                 (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
+                   (unsafe-z2zfft nx
+                                  (fft-buffer-pr dst)
+                                  (fft-buffer-pi dst)
+                                  direction
+                                  prtmp pitmp twids)))
                dst))
-
-          ((eql ltype 'single-float)
-           (unsafe-c2c arr direction nx nxa dest))
-
-          ((eql ltype 'double-float)
-           (unsafe-z2z arr direction nx nxa dest))
-
-          (t (error "Invalid precision for FFT"))
-          ))))
+              
+            ((eql ltype 'single-float)
+             (unsafe-c2c arr direction nx nxa dest))
+              
+            ((eql ltype 'double-float)
+             (unsafe-z2z arr direction nx nxa dest))
+              
+            (t (error "Invalid precision for FFT"))
+            ))))
 
 ;; --------------------------------------------------------------
 
 (defun fwd (arr &key
-                (precision :single-float)
+                (precision (effective-array-element-type arr))
                 dest)
   (z2z arr $fftw-forward precision dest))
 
 
 (defun inv (arr &key
-                (precision :single-float)
+                (precision (effective-array-element-type arr))
                 dest)
   (z2z arr $fftw-inverse precision dest))
 
@@ -575,16 +614,25 @@
 
 (defun fast-fft-oper (arr after-fn dest)
   (um:bind*
-      ((:values (rarr roff) (get-real arr))
-       (:values (iarr ioff) (get-imag arr))
+      ((:values (rarr roff ptr) (get-real arr))
+       (:values (iarr ioff pti) (get-imag arr))
        (type    (array-element-type rarr))
-       (dst     (or dest (fft-buffer-hr arr))))
+       (dst     (or dest (fft-buffer-hr arr)))
+       (nx      (fft-buffer-nx arr)))
     (set-imag arr 0)
-    (funcall (if (eql type 'single-float)
-                 #'unsafe-c2cfft
-               #'unsafe-z2zfft)
-             (fft-buffer-nx arr)
-             rarr roff iarr ioff $fftw-forward)
+    (if (eql type 'single-float)
+        (let ((twids (get-stwids nx)))
+          (multiple-value-bind (prtmp pitmp) (get-stmp nx)
+            (unsafe-c2cfft
+             nx
+             ptr pti $fftw-forward
+             prtmp pitmp twids)))
+      (let ((twids (get-dtwids nx)))
+        (multiple-value-bind (prtmp pitmp) (get-dtmp nx)
+          (unsafe-z2zfft
+           nx
+           ptr pti $fftw-forward
+           prtmp pitmp twids))))
     (dotimes (ix (length dst))
       (setf (aref dst ix) (funcall after-fn
                                    (aref rarr (+ ix roff))
@@ -594,7 +642,7 @@
 ;; --------------------------------------------------------------
 
 (defun fwd-magnitude (arr &key
-                          (precision :single-float)
+                          (precision (effective-array-element-type arr))
                           dest)
   (cond ((fast-capable-p arr)
          (fast-fwd-magnitude arr dest))
@@ -611,7 +659,7 @@
 ;; --------------------------------------------------------------
 
 (defun fwd-power (arr &key
-                      (precision :single-float)
+                      (precision (effective-array-element-type arr))
                       dest)
   (cond ((fast-capable-p arr)
          (fast-fwd-power arr dest))
@@ -627,7 +675,7 @@
 ;; --------------------------------------------------------------
 
 (defun fwd-magnitude-db (arr &key
-			     (precision :single-float)
+			     (precision (effective-array-element-type arr))
 			     dest)
   (cond ((fast-capable-p arr)
          (fast-fwd-magnitude-db arr dest))
@@ -643,7 +691,7 @@
 ;; --------------------------------------------------------------
 
 (defun fwd-phase (arr &key
-                      (precision :single-float)
+                      (precision (effective-array-element-type arr))
                       dest)
   (cond ((fast-capable-p arr)
          (fast-fwd-phase arr dest))
@@ -659,7 +707,7 @@
 ;; --------------------------------------------------------------
 
 (defun fwd-phase-deg (arr &key
-			  (precision :single-float)
+			  (precision (effective-array-element-type arr))
 			  dest)
   (cond ((fast-capable-p arr)
          (fast-fwd-phase-deg arr dest))

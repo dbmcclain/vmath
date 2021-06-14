@@ -12,8 +12,7 @@
   (fli:register-module :fftlib
                        :real-name
                        (translate-logical-pathname
-                        #+:LISPWORKS-32BIT "PROJECTS:DYLIB;libLispFFT.dylib"
-                        #+:LISPWORKS-64BIT "PROJECTS:DYLIB64;libLispFFT-64.dylib")))
+                        "PROJECTS:DYLIB;libLispFFT.dylib")))
 
 ;; ------------------------------------------------------------
 (fli:define-foreign-function (getfftversionstring
@@ -36,7 +35,10 @@
 (fli:define-foreign-function (d2zfft "d2zfft" :source)
     ((nx :int)
      (src (:pointer :double))
-     (dst (:pointer :double)))
+     (dst (:pointer :double))
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -44,7 +46,10 @@
 (fli:define-foreign-function (z2dfft "z2dfft" :source)
     ((nx :int)
      (src (:pointer :double))
-     (dst (:pointer :double)))
+     (dst (:pointer :double))
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -53,18 +58,22 @@
     ((nx :int)
      (src (:pointer :double))
      (dst (:pointer :double))
-     (direction :int))
+     (direction :int)
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
 
 (fli:define-foreign-function (unsafe-z2zfft "unsafe_z2zfft" :source)
     ((nx :int)
-     (src-r :lisp-simple-1d-array)
-     (src-roff :int)
-     (src-i :lisp-simple-1d-array)
-     (src-ioff :int)
-     (direction :int))
+     (src-r :uintptr)
+     (src-i :uintptr)
+     (direction :int)
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -76,7 +85,10 @@
     ((nx :int)
      (ny :int)
      (src (:pointer :double))
-     (dst (:pointer :double)))
+     (dst (:pointer :double))
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -85,7 +97,10 @@
     ((nx :int)
      (ny :int)
      (src (:pointer :double))
-     (dst (:pointer :double)))
+     (dst (:pointer :double))
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -95,7 +110,10 @@
      (ny :int)
      (src (:pointer :double))
      (dst (:pointer :double))
-     (direction :int))
+     (direction :int)
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -103,11 +121,12 @@
 (fli:define-foreign-function (unsafe-z2zfft2d "unsafe_z2zfft2d" :source)
     ((nx :int)
      (ny :int)
-     (src-r :lisp-simple-1d-array)
-     (src-roff :int)
-     (src-i :lisp-simple-1d-array)
-     (src-ioff :int)
-     (direction :int))
+     (src-r :uintptr)
+     (src-i :uintptr)
+     (direction :int)
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -117,7 +136,10 @@
 (fli:define-foreign-function (r2cfft "r2cfft" :source)
     ((nx :int)
      (src (:pointer :float))
-     (dst (:pointer :float)))
+     (dst (:pointer :float))
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -125,7 +147,10 @@
 (fli:define-foreign-function (c2rfft "c2rfft" :source)
     ((nx :int)
      (src (:pointer :float))
-     (dst (:pointer :float)))
+     (dst (:pointer :float))
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -134,18 +159,22 @@
     ((nx :int)
      (src (:pointer :float))
      (dst (:pointer :float))
-     (direction :int))
+     (direction :int)
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
 
 (fli:define-foreign-function (unsafe-c2cfft "unsafe_c2cfft" :source)
     ((nx :int)
-     (src-r :lisp-simple-1d-array)
-     (src-roff :int)
-     (src-i :lisp-simple-1d-array)
-     (src-ioff :int)
-     (direction :int))
+     (src-r :uintptr)
+     (src-i :uintptr)
+     (direction :int)
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -156,7 +185,10 @@
     ((nx :int)
      (ny :int)
      (src (:pointer :float))
-     (dst (:pointer :float)))
+     (dst (:pointer :float))
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -165,7 +197,10 @@
     ((nx :int)
      (ny :int)
      (src (:pointer :float))
-     (dst (:pointer :float)))
+     (dst (:pointer :float))
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -175,7 +210,10 @@
      (ny :int)
      (src (:pointer :float))
      (dst (:pointer :float))
-     (direction :int))
+     (direction :int)
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
   :language :ansi-c
   :module *fftx-library*)
@@ -183,12 +221,39 @@
 (fli:define-foreign-function (unsafe-c2cfft2d "unsafe_c2cfft2d" :source)
     ((nx :int)
      (ny :int)
-     (src-r :lisp-simple-1d-array)
-     (src-roff :int)
-     (src-i :lisp-simple-1d-array)
-     (src-ioff :int)
-     (direction :int))
+     (src-r :uintptr)
+     (src-i :uintptr)
+     (direction :int)
+     (tmp-r :uintptr)
+     (tmp-i :uintptr)
+     (twids :uintptr))
   :result-type :int
+  :language :ansi-c
+  :module *fftx-library*)
+
+;; -------------------------------------------------------
+
+(fli:define-foreign-function (create-fft-setup "create_fft_setup" :source)
+    ((lg2n :int))
+  :result-type :uintptr
+  :language :ansi-c
+  :module *fftx-library*)
+
+(fli:define-foreign-function (create-fft-setupD "create_fft_setupD" :source)
+    ((lg2n :int))
+  :result-type :uintptr
+  :language :ansi-c
+  :module *fftx-library*)
+
+(fli:define-foreign-function (destroy-fft-setup "destroy_fft_setup" :source)
+    ((twids :uintptr))
+  :result-type :void
+  :language :ansi-c
+  :module *fftx-library*)
+
+(fli:define-foreign-function (destroy-fft-setupD "destroy_fft_setupD" :source)
+    ((twids :uintptr))
+  :result-type :void
   :language :ansi-c
   :module *fftx-library*)
 
@@ -197,6 +262,24 @@
 (fli:define-foreign-function (get-align16-offset "get_align16_offset" :source)
     ((buf  :lisp-simple-1d-array))
   :result-type :int
+  :language :ansi-c
+  :module *fftx-library*)
+
+(fli:define-foreign-function (get-align32-offset "get_align32_offset" :source)
+    ((buf  :lisp-simple-1d-array))
+  :result-type :int
+  :language :ansi-c
+  :module *fftx-library*)
+
+(fli:define-foreign-function (get-align64-offset "get_align64_offset" :source)
+    ((buf  :lisp-simple-1d-array))
+  :result-type :int
+  :language :ansi-c
+  :module *fftx-library*)
+
+(fli:define-foreign-function (get-c-address "get_c_address" :source)
+    ((buf  :lisp-simple-1d-array))
+  :result-type :uintptr
   :language :ansi-c
   :module *fftx-library*)
 
@@ -220,8 +303,7 @@
   (fli:register-module :siglab
                        :real-name
                        (translate-logical-pathname
-                        #+:LISPWORKS-32BIT "PROJECTS:DYLIB;libLispSigLab.dylib"
-                        #+:LISPWORKS-64BIT "PROJECTS:DYLIB64;libLispSigLab-64.dylib")))
+                        "PROJECTS:DYLIB;libLispSigLab.dylib")))
 
 (fli:define-foreign-function (disable-denormals
                               "siglab_disable_denormals"

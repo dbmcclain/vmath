@@ -29,6 +29,14 @@
    #:vpow10
    #:vexpt
    #:destructure-vector
+   #:vlimit<
+   #:vlimit>
+   #:extrema
+   #:vextrema
+   #:clip
+   #:vclip
+   #:wrap
+   #:vwrap
    ))
 
 (defpackage :fft
@@ -80,7 +88,19 @@
    #:fwd-phase
    #:fwd-phase-deg
    #:get-align16-offset
-   #:siglab_sbFFT))
+   #:siglab_sbFFT
+
+   #:symmetric-fill
+   #:symmetric-replace
+   #:center-implant
+
+   #:get-stwids
+   #:get-dtwids
+   #:get-process-split-tmp
+   #:get-stmp
+   #:get-dtmp
+   #:get-c-address
+   ))
 
 #+:MACOSX
 (defpackage :fft2d
@@ -386,6 +406,8 @@
    #:dgesvd-bksb
    #:dgesvd-predict
 
+   #:simplex
+   
    #:without-denormals
    ))
    
@@ -467,6 +489,7 @@
   (:use #:common-lisp)
   (:nicknames #:interp)
   (:export
+   #:linint
    #:polint
    #:ratint
    #:locate
@@ -486,6 +509,29 @@
    #:qromb
    #:qrombm
    #:sub-array
+   ))
+
+(defpackage #:roots
+  (:use #:common-lisp)
+  (:export
+   #:find-root
+   #:newton
+   #:deriv
+   #:zbrac
+   #:rtbis
+   #:rtsec
+   #:zbrent
+   #:rtsafe
+   ))
+
+(defpackage :kaiser
+  (:use :cl)
+  (:export
+   :kaiser-window
+   :sinc
+   :beta-factor
+   :compute-fir-filter-order
+   :bessel-i0
    ))
 
 #|

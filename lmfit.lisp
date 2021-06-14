@@ -6,17 +6,20 @@
 (defpackage :lmfit
   (:use #:common-lisp)
   (:export
-   #:fit))
+   #:fit
+   #:fitnd))
 
 (in-package :lmfit)
 
 ;; ------------------------------------------------------------
 ;; Levenberg-Marquardt Nonlinear LSQ Fitting
 
-(defun fit (v errfn derfn)
+(defun fit (v errfn derfn &key verbose (verbose-interval 100) stop-chisq iter-limit
+              verbose-fn)
   (let* ((nparm  (length v))
          (errs   (funcall errfn v))
-         (ndof   (- (length errs) nparm)))
+         (ndof   (- (length errs) nparm))
+         (verbose-count 0))
     (labels ((chisq (v)
                (let ((errs (funcall errfn v)))
                  (/ (matrix:<*> errs errs) ndof)))
@@ -40,7 +43,12 @@
                                          (matrix:aref malpha jx ix) tot)) ))) )
                  
                  (labels ((solve (lam)
-                            ;; (format t "~%Solve: lam = ~g" lam)
+                            
+                            (incf verbose-count)
+                            (when verbose
+                              (when (zerop (mod verbose-count verbose-interval))
+                                (format t "~%Solve: lam = ~g, ctr = ~A" lam verbose-count)))
+
                             (let ((malphax (matrix:copy malpha)))
                               (loop for ix from 0 below nparm do
                                     (setf (matrix:aref malphax ix ix)
@@ -52,18 +60,30 @@
                                      (vx (vops:vsub v dv))
                                      (chisqx (chisq vx))
                                      (dchisq (abs (- chisq0 chisqx))))
-                                ;; (format t "~%ChiSq = ~g" chisqx)
+                                (when (and verbose
+                                           (zerop (mod verbose-count verbose-interval)))
+                                  (when (functionp verbose-fn)
+                                    (funcall verbose-fn vx))
+                                  (format t "~%ChiSq = ~g" chisqx)
+                                  (format t "~A" vx))
                                 (if (or (< dchisq (* 1d-6 chisq0))
-                                        (< chisqx 1d-12))
+                                        (< chisqx 1d-12)
+                                        (and (numberp stop-chisq)
+                                             (> verbose-count verbose-interval)
+                                             (> chisqx stop-chisq))
+                                        (and (numberp iter-limit)
+                                             (> verbose-count iter-limit)))
                                     (let ((cov (ignore-errors
                                                  (matrix:sqrt
                                                   (matrix:* chisqx
                                                             (matrix:abs
                                                              (matrix:inv malpha)))))))
-                                      (unless cov
-                                        (print "LMFIT: Singular COV"))
-                                      ;; (format t "~%Finished...")
-                                      (values chisqx vx cov))
+                                      (if cov
+                                          (when verbose
+                                            (format t "~%Finished..."))
+                                        (print "~%LMFIT: Singular COV"))
+
+                                      (values chisqx vx cov verbose-count lam))
                                   ;; else
                                   (if (> chisqx chisq0)
                                       (solve (* 10d0 lam))
@@ -72,3 +92,24 @@
                    (solve lam)))))
       (iter (chisq v) v 0.001d0))))
 
+;; ---------------------------------------
+;; LM Fitting when you have no partial derivatives to offer...
+
+(defun fitnd (v errfn &rest args)
+  (labels ((pders (v)
+             (coerce
+              (loop for x across v
+                    for ix from 0
+                    collect
+                    (labels ((subst-parm (x)
+                               (setf (aref v ix) x)
+                               v))
+                      (let* ((dx (max 0.001 (* 0.01 (abs x))))
+                             (errs+ (funcall errfn (subst-parm (+ x dx))))
+                             (errs- (funcall errfn (subst-parm (- x dx)))))
+                        (subst-parm x)
+                        (vops:vscale (/ 0.5 dx)
+                                     (vops:vsub errs+ errs-))
+                        )))
+              'vector)))
+    (apply #'fit v errfn #'pders args)))

@@ -6,11 +6,28 @@
 (defmacro bref (arr ix)
   `(aref ,arr (1- ,ix)))
 
+(defmethod linint ((xs vector) (ys vector) (x real) &optional prev-ix)
+  (let* ((nel (length xs)))
+    (assert (<= nel (length ys)))
+    (let ((ix  (locate xs x prev-ix)))
+      (when (>= ix (1- nel))
+        (decf ix))
+      (let* ((x<    (aref xs ix))
+             (ixp1  (1+ ix))
+             (fr (/ (- x x<)
+                    (- (aref xs ixp1) x<))))
+        (values
+         (+ (* (aref ys ixp1) fr)
+            (* (aref ys ix) (- 1 fr)))
+         ix)
+        ))))
+
+
 (defmethod polint ((xs vector) (ys vector) (x real))
   ;; given vectors xs and ys, and an abscissa x,
   ;; return the interpolate y and error estimate dy.
-  (let* ((nel (array-total-size xs)))
-    (assert (<= nel (array-total-size ys)))
+  (let* ((nel (length xs)))
+    (assert (<= nel (length ys)))
     (let ((dif (abs (- x (bref xs 1))))
           (ns  1)
           (cs (copy-seq ys))
@@ -59,8 +76,8 @@
 ;; rational (Pade) interpolation
 
 (defmethod ratint ((xs vector) (ys vector) (x real)) ;; -> y, dy
-  (let ((nel (array-total-size xs)))
-    (assert (>= (array-total-size ys) nel))
+  (let ((nel (length xs)))
+    (assert (>= (length ys) nel))
     (let ((ns  1)
           (cs  (copy-seq ys))
           (ds  (copy-seq ys))
@@ -137,8 +154,8 @@
   ;;
   ;; Routine returns vector of second derivatives used for spline interpolation below.
   ;; This routine is called just once to analyze the data and prepare the 2nd ders.
-  (let ((nel (array-total-size xs)))
-    (assert (>= (array-total-size ys) nel))
+  (let ((nel (length xs)))
+    (assert (>= (length ys) nel))
 
     (let ((u  (make-array (1- nel)))
           (y2 (make-array nel)))
@@ -219,7 +236,7 @@
       
       (setf prev-k (1- klo))
       
-      (if (>= klo (array-total-size xs))
+      (if (>= klo (length xs))
           ;; check for off right-end of table
           (progn
             (decf klo)
@@ -299,7 +316,7 @@
     (plt:plot 'plt2 pxs (map 'vector (lambda (x)
                                        (splint spl2 x))
                              pxs)
-              :color :magenta
+              :color :orange
               :thick 2
               :legend "der match cubic spline")
     (plt:plot 'plt pxs (map 'vector (lambda (x) (- (splint spl2 x)
