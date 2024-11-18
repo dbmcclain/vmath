@@ -3,7 +3,7 @@
 ;; DM/MCFA  08/99
 ;; --------------------------------------------------------
 
-(in-package "SCIGRAPH")
+(in-package #:com.ral.scigraph)
 
 (defconstant $WHITE     (rgb 255 255 255))
 (defconstant $BLACK     (rgb   0   0   0))

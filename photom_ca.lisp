@@ -4,7 +4,6 @@
 
 (defpackage "PHOTOMETRY"
   (:use "COMMON-LISP")
-  (:nicknames "PHOT")
   (:export
    "PHOTOM"))
 

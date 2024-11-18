@@ -1,4 +1,4 @@
-(in-package :vm)
+(in-package #:com.ral.vectorized-math)
 
 (defvar *dgesvd-library*
   (translate-logical-pathname

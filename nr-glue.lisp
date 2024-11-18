@@ -1,17 +1,16 @@
 
-(defpackage nrglue
-  (:nicknames nrg)
+(defpackage #:com.ral.nrglue
   (:export
-   laguer
-   zroots
-   memcof
-   evlmem
-   fixrts
-   predic
+   #:laguer
+   #:zroots
+   #:memcof
+   #:evlmem
+   #:fixrts
+   #:predic
    ))
 
 
-(in-package :nrglue)
+(in-package #:com.ral.nrglue)
 
 (defun dfloat (x) 
  (declare (type number x))

@@ -3,13 +3,13 @@
  | PROCESSED FILE : D:\Projects\LispWorks\vmath\scigraph_intf.h
  |#
 
-(in-package "SCIGRAPH")
+(in-package #:com.ral.scigraph)
 
 ;;; Derived from file : "C:\\TEMP\\PCL19E.h"
-;;; Handed edited for module linkage - DM/MCFA 12/01
+;;; Hand edited for module linkage - DM/MCFA 12/01
 
 (defvar *plotter-dll*
-  (translate-logical-pathname "PROJECTS:DYLIB;libLispAquaTermPlotter.dylib"))
+  (translate-logical-pathname "PROJECTS:LIB;libLispAquaTermPlotter.dylib"))
 
 (fli:define-c-struct (twindow-setup (:foreign-name "Twindow_setup"))
   (wid     :int)

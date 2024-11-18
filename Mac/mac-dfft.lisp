@@ -3,112 +3,11 @@
 ;; DM/MCFA  08/99
 ;; --------------------------------------------------
 
-(in-package :DFFT)
+(in-package #:com.ral.dfft)
 
 ;; ------------------------------------------------------------------
 
-(defstruct (fft-buffer
-            (:constructor make-fft-buf))
-  nx
-  r i
-  roff ioff
-  hr
-  pr pi)
-
-(defun half-dim (n)
-  (1+ (truncate n 2)))
-
-(defun nfloats (nb)
-  (assert (zerop (logand nb 7))) ;; assure that our offsets are multiples of 8 bytes
-  (truncate nb 8))
-
-(defun make-fft-buffer (nx)
-  (let* ((nxa   (max 8 (um:ceiling-pwr2 nx)))
-         (rarr  (make-array (+ nxa 1) :element-type 'double-float :allocation :static))
-         (iarr  (make-array (+ nxa 3) :element-type 'double-float :allocation :static))
-         (roff  (nfloats (fft:get-align16-offset rarr)))
-         (ioff  (nfloats (fft:get-align16-offset iarr)))
-         (hrarr (make-array (half-dim nxa)
-                            :element-type 'double-float
-                            :displaced-to rarr
-                            :displaced-index-offset roff)))
-    (if (zerop (logand (- (+ (* 8 ioff) (sys:object-address iarr))
-                          (+ (* 8 roff) (sys:object-address rarr)))
-                       (1- 1024)))
-        ;; offset ioff by another 2 to avoid the Pentium quirk when two buffer addresses differ
-        ;; by multiple of 1024 bytes.
-        (incf ioff 2)) ;; bump by another 16 bytes
-    (let ((ptr  (+ (* roff 8) (get-c-address rarr)))
-          (pti  (+ (* ioff 8) (get-c-address iarr))))
-      (assert (zerop (logand 15 ptr)))
-      (assert (zerop (logand 15 pti)))
-                          
-      (make-fft-buf
-       :nx   nxa
-       :r    rarr
-       :roff roff
-       :i    iarr
-       :ioff ioff
-       :hr   hrarr
-       :pr   ptr
-       :pi   pti)
-      )))
-
-(defun get-real (fftbuf)
-  (values (fft-buffer-r fftbuf) (fft-buffer-roff fftbuf) (fft-buffer-pt fftbuf)))
-
-(defun get-imag (fftbuf)
-  (values (fft-buffer-i fftbuf) (fft-buffer-ioff fftbuf) (fft-buffer-pi fftbuf)))
-
-(defmethod set-real (fftbuf (arr vector))
-  (replace (fft-buffer-r fftbuf) arr
-           :start1 (fft-buffer-roff fftbuf)))
-
-(defmethod set-real (fftbuf (val double-float))
-  (fill (fft-buffer-r fftbuf) val :start (fft-buffer-roff fftbuf)))
-
-(defmethod set-imag (fftbuf (arr vector))
-  (replace (fft-buffer-i fftbuf) arr
-           :start1 (fft-buffer-ioff fftbuf)))
-
-(defmethod set-imag (fftbuf (val double-float))
-  (fill (fft-buffer-i fftbuf) val :start (fft-buffer-ioff fftbuf)))
-
-(defun copy-fft-buffer-contents (src dst)
-  (replace (fft-buffer-r dst) (fft-buffer-r src)
-           :start1 (fft-buffer-roff dst)
-           :start2 (fft-buffer-roff src))
-  (replace (fft-buffer-i dst) (fft-buffer-i src)
-           :start1 (fft-buffer-ioff dst)
-           :start2 (fft-buffer-ioff src)))
-
 ;; ------------------------------------------------------------------
-
-(defun pwr (r i)
-  (declare (type double-float r i))
-  (+ (* r r) (* i i)))
-
-(defun ampl (r i)
-  (declare (type double-float r i))
-  (sqrt (pwr r i)))
-
-(defun db10 (r i)
-  (declare (type double-float r i))
-  (* 10d0 (log (pwr r i) 10d0)))
-
-(defun rtod (x)
-  (declare (type double-float x))
-  (* #.(/ 180d0 pi) x))
-
-(defun phs-deg (r i)
-  (declare (type double-float r i))
-  (rtod (phs r i)))
-
-(defun phs (r i)
-  (declare (type double-float r i))
-  (atan i r))
-
-;; -----------------------------------------------------------
 
 (defun d2z (arr)
   ;; in-place routine
@@ -193,6 +92,32 @@
     dst))
     
 ;; --------------------------------------------------------------
+
+(defun pwr (r i)
+  (declare (type double-float r i))
+  (+ (* r r) (* i i)))
+
+(defun ampl (r i)
+  (declare (type double-float r i))
+  (sqrt (pwr r i)))
+
+(defun db10 (r i)
+  (declare (type double-float r i))
+  (* 10d0 (log (pwr r i) 10d0)))
+
+(defun rtod (x)
+  (declare (type double-float x))
+  (* #.(/ 180d0 pi) x))
+
+(defun phs-deg (r i)
+  (declare (type double-float r i))
+  (rtod (phs r i)))
+
+(defun phs (r i)
+  (declare (type double-float r i))
+  (atan i r))
+
+;; -----------------------------------------------------------
 
 (defun fwd-magnitude (arr &key dest)
   (fast-real-fft-oper arr #'ampl dest))

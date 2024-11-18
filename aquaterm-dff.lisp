@@ -3,7 +3,7 @@
  | PROCESSED FILE : /Users/davidmcclain/Projects/AquaTerm1.0.a2/include/aquaterm.h
  |#
 
-(in-package "AQUATERM")
+(in-package #:com.ral.aquaterm)
 
 ;;; Derived from file : "/Users/davidmcclain/Projects/AquaTerm1.0.a2/include/aquaterm.h"
 

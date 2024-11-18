@@ -1,5 +1,5 @@
 
-(in-package :fft)
+(in-package #:com.ral.fft)
 
 ;; --------------------------------------------------------------
 
@@ -7,16 +7,9 @@
 (defvar *twids*       nil)
 (defvar *twids-timer* nil)
 
-(defstruct twids
-  expir
-  refct
-  prec
-  log2n
-  psetup)
-
 (defun scan-twids ()
-  (let ((now (get-universal-time)))
-    (mp:with-lock (*twids-lock*)
+  (mp:with-lock (*twids-lock*)
+    (let ((now (get-universal-time)))
       (if (um:deletef-if *twids* (lambda (twids)
                                    (when (and (zerop (twids-refct twids))
                                               (> now (twids-expir twids)))
@@ -49,7 +42,7 @@
         (sys:atomic-fixnum-incf (twids-refct twids))
         (unless *twids-timer*
           (setf *twids-timer* (mp:make-timer #'mp:funcall-async #'scan-twids))
-          (mp:schedule-timer-relative *twids-timer* 11))
+          (mp:schedule-timer-relative *twids-timer* 10))
         twids))
     ))
 
@@ -60,14 +53,6 @@
 (defun get-dtwids (nx)
   ;; called by FFT routines
   (get-twids nx 'double-float))
-
-(defmacro with-stwids ((stwids nx) &body body)
-  `(do-with-twids (get-stwids ,nx) (lambda (,stwids)
-                                     ,@body)))
-
-(defmacro with-dtwids ((dtwids nx) &body body)
-  `(do-with-twids (get-dtwids ,nx) (lambda (,dtwids)
-                                     ,@body)))
 
 (defun do-with-twids (twids fn)
   (unwind-protect
@@ -89,7 +74,7 @@
     (unless (and (fft-buffer-p tmp)
                  (eql type (array-element-type (fft-buffer-r tmp)))
                  (>= (array-total-size (fft-buffer-r tmp)) nx))
-      (setf tmp (make-fft-buffer nx type)
+      (setf tmp (make-1d-fft-buffer nx type)
             (get-process-split-tmp) tmp))
     (unless (= (fft-buffer-nx tmp) nx)
       (setf (fft-buffer-nx tmp) nx
@@ -118,7 +103,7 @@
   (let ((tmp  (get-process-tmp)))
     (unless (and (fft-buffer-p tmp)
                  (>= (array-total-size (fft-buffer-r tmp)) nx))
-      (setf tmp (make-fft-buffer nx 'single-float)
+      (setf tmp (make-1d-fft-buffer nx 'single-float)
             (get-process-tmp) tmp))
     ;; (chk-buf tmp)
     (values (fft-buffer-pr tmp)

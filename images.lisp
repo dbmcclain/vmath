@@ -1,7 +1,7 @@
 ;; images.lisp -- 2-D Image arrays in Lisp
 ;; DM/MCFA  08/99
 
-(in-package "IMAGE-PROCESSING")
+(in-package #:com.ral.image-processing)
 
 ;; Image arrays contain flat, row-major, rank 2, arrays of values.
 (defclass <image-array> ()
@@ -388,7 +388,7 @@
 ;; -------------------------------------------------------------
 
 (defmethod where (predicate (a <image-array>))
-  (useful-macros:where predicate (image-array-arena a)))
+  (um:where predicate (image-array-arena a)))
 
 (defmethod total ((a <image-array>))
   (pixelwise-reduce #'+ a))

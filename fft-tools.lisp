@@ -1,5 +1,5 @@
 
-(in-package :fft)
+(in-package #:com.ral.fft)
 
 ;; -------------------------------------------------------------------------
 ;; An FFT vector contains elements from positive freqs in first half, followed

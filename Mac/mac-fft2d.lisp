@@ -3,93 +3,9 @@
 ;; DM/MCFA  08/99
 ;; --------------------------------------------------
 
-(in-package :FFT2D)
+(in-package #:com.ral.fft2d)
 
 ;; ------------------------------------------------------------------
-
-(defstruct (fft-buffer
-            (:constructor make-fft-buf))
-  ny nx
-  r i
-  roff ioff
-  hr
-  pr pi)
-
-(defun half-dim (n)
-  (1+ (truncate n 2)))
-
-(defun nfloats (nb type-size)
-  (assert (zerop (logand nb (1- type-size)))) ;; assure that our offsets are multiples of 4 bytes
-  (truncate nb type-size))
-
-(defun make-fft-buffer (ny nx type)
-  (let* ((type-size (ecase type
-                      (single-float 4)
-                      (double-float 8)))
-         (nya   (if (= 1 ny) 1 (max 8 (um:ceiling-pwr2 ny))))
-         (nxa   (max 8 (um:ceiling-pwr2 nx)))
-         (rarr  (make-array (+ (* nxa nya) 3) :element-type type :allocation :static))
-         (roff  (nfloats (fft:get-align16-offset rarr) type-size))
-         (iarr  (make-array (+ (* nxa nya) 7) :element-type type :allocation :static))
-         (ioff  (nfloats (fft:get-align16-offset iarr) type-size))
-         (hrarr (make-array (if (> ny 1)
-                                (list (half-dim nya) (half-dim nxa))
-                              (half-dim nxa))
-                            :element-type type
-                            :displaced-to rarr
-                            :displaced-index-offset roff)))
-    (if (zerop (logand (- (+ (* 4 ioff) (sys:object-address iarr))
-                          (+ (* 4 roff) (sys:object-address rarr)))
-                       (1- 1024)))
-        ;; offset ioff by another 4 to avoid the Pentium quirk when two buffer addresses differ
-        ;; by multiple of 1024 bytes.
-        (incf ioff 4)) ;; bump by another 16 bytes
-    (let ((ptr  (+ (* roff type-size) (fft:get-c-address rarr)))
-          (pti  (+ (* ioff type-size) (fft:get-c-address iarr))))
-      (assert (zerop (logand 15 ptr)))
-      (assert (zerop (logand 15 pti)))
-                          
-      (make-fft-buf
-       :ny   nya
-       :nx   nxa
-       :r    rarr
-       :roff roff
-       :i    iarr
-       :ioff ioff
-       :hr   hrarr
-       :pr   ptr
-       :pi   pti)
-      )))
-
-(defun get-real (fftbuf)
-  (values (fft-buffer-r fftbuf) (fft-buffer-roff fftbuf) (fft-buffer-pr fftbuf)))
-
-(defun get-imag (fftbuf)
-  (values (fft-buffer-i fftbuf) (fft-buffer-ioff fftbuf) (fft-buffer-pi fftbuf)))
-
-(defmethod set-real (fftbuf (arr vector))
-  (replace (fft-buffer-r fftbuf) arr
-           :start1 (fft-buffer-roff fftbuf)))
-
-(defmethod set-real (fftbuf (val real))
-  (multiple-value-bind (buf off) (get-real fftbuf)
-    (fill buf (coerce val (array-element-type buf)) :start off)))
-
-(defmethod set-imag (fftbuf (arr vector))
-  (replace (fft-buffer-i fftbuf) arr
-           :start1 (fft-buffer-ioff fftbuf)))
-
-(defmethod set-imag (fftbuf (val real))
-  (multiple-value-bind (buf off) (get-imag fftbuf)
-    (fill buf (coerce val (array-element-type buf)) :start off)))
-
-(defun copy-fft-buffer-contents (src dst)
-  (replace (fft-buffer-r dst) (fft-buffer-r src)
-           :start1 (fft-buffer-roff dst)
-           :start2 (fft-buffer-roff src))
-  (replace (fft-buffer-i dst) (fft-buffer-i src)
-           :start1 (fft-buffer-ioff dst)
-           :start2 (fft-buffer-ioff src)))
 
 ;; --------------------------------------------------------------------
 
@@ -118,45 +34,6 @@
 (defmethod effective-array-dimensions ((arr fft-buffer))
   (values (fft-buffer-ny arr)
           (fft-buffer-nx arr)))
-
-(defun effective-type (type)
-  (cond ((and (consp type)
-              (eql 'complex (car type)))
-         (cadr type))
-        (t
-         type)))
-
-(defmethod effective-array-element-type ((arr vector))
-  (let ((type (array-element-type arr)))
-    (cond ((eql type 't)
-           (effective-type (type-of (aref arr 0))))
-          (t
-           (effective-type type))
-          )))
-
-(defmethod effective-array-element-type ((arr array))
-  (let ((type (array-element-type arr)))
-    (cond ((eql type 't)
-           (effective-type (type-of (row-major-aref arr 0))))
-          (t
-           (effective-type (array-element-type arr)))
-          )))
-
-(defmethod effective-array-element-type ((arr fft-buffer))
-  (effective-type (array-element-type (fft-buffer-r arr))))
-
-(defun effective-ctype (precision)
-  (ecase precision
-    ((:float :single :single-float :altivec single-float) 
-     (values :float 'single-float))
-    ((:double :double-float :fftw double-float)
-     (values :double 'double-float))))
-
-(defun vec (arr &key (size (array-total-size arr)) (offset 0))
-  (make-array size
-              :displaced-to arr
-              :displaced-index-offset offset
-              :element-type (array-element-type arr)))
 
 (defun copy-array-to-real-cvect (arr cdst ny nx &key precision)
   (multiple-value-bind (nya nxa) (effective-array-dimensions arr)
@@ -220,131 +97,49 @@
                                          dest
                                          precision)
   (let* ((rslt  (or dest (make-result-array ny nx precision)))
-         (vrslt (vec rslt))
-         (arrsiz (* nx ny)))
-    (do ((ix 0 (1+ ix)))
-        ((>= ix arrsiz) rslt)
-      (setf (aref vrslt ix) (fli:dereference csrc :index ix)))
-    ))
+         (vrslt (vec rslt)))
+    (fli:replace-foreign-array vrslt csrc)
+    rslt))
 
-(defun convert-complex-cvect-to-array (csrc ny nx
-                                            &key
-                                            dest
-                                            precision)
+(defun delegate-to-FFT (fn csrc ny nx &key dest precision)
   (let* ((rslt  (or dest (make-complex-result-array ny nx precision)))
-         (vrslt (vec rslt))
-         (arrsiz (* nx ny)))
-    (do ((cix 0 (+ cix 2))
-         (rix 0 (1+ rix)))
-        ((>= rix arrsiz) rslt)
-      (setf (aref vrslt rix)
-            (complex (fli:dereference csrc :index cix)
-                     (fli:dereference csrc :index (1+ cix))))
-      )))
-
-(defun db20 (x)
-  (* 20.0 (log (abs x) 10.0)))
+         (vrslt (vec rslt)))
+    (funcall fn csrc (* nx ny) :dest vrslt :precision precision)
+    rslt
+    ))
+  
+(defun convert-complex-cvect-to-array (&rest args)
+  (apply #'delegate-to-FFT 
+         #'fft:convert-complex-cvect-to-array args))
 
 (defun db10 (x)
   (* 10.0 (log (abs x) 10.0)))
 
-(defun dtor (x)
-  (* #. (/ (atan 1 1) 45) x))
-
 (defun rtod (x)
-  (* #. (/ 45 (atan 1 1)) x))
-
-(defun phase-deg (x)
-  (rtod (phase x)))
-
-(defun convert-complex-cvect-magnitudes-to-array (csrc ny nx
-                                                       &key
-                                                       dest
-                                                       precision)
-  (let* ((rslt  (or dest (make-result-array ny nx precision)))
-         (vrslt (vec rslt))
-         (arrsiz (* nx ny)))
-    (do ((cix 0 (+ cix 2))
-         (rix 0 (1+ rix)))
-        ((>= rix arrsiz) rslt)
-      (setf (aref vrslt rix)
-            (coerce
-             (abs (complex (fli:dereference csrc :index cix)
-                           (fli:dereference csrc :index (1+ cix))))
-             precision))
-      )))
+  (* #.(/ 45 (atan 1 1)) x))
 
 (defun sq (x)
   (* x x))
 
-(defun convert-complex-cvect-power-to-array (csrc ny nx
-                                                       &key
-                                                       dest
-                                                       precision)
-  (let* ((rslt  (or dest (make-result-array ny nx precision)))
-         (vrslt (vec rslt))
-         (arrsiz (* nx ny)))
-    (do ((cix 0 (+ cix 2))
-         (rix 0 (1+ rix)))
-        ((>= rix arrsiz) rslt)
-      (setf (aref vrslt rix)
-            (coerce
-             (+ (sq (fli:dereference csrc :index cix))
-                (sq (fli:dereference csrc :index (1+ cix))))
-             precision))
-      )))
+(defun convert-complex-cvect-magnitudes-to-array (&rest args)
+  (apply #'delegate-to-FFT
+         #'fft:convert-complex-cvect-magnitudes-to-array args))
 
-(defun convert-complex-cvect-magnitudes-db-to-array (csrc ny nx
-							  &key
-							  dest
-							  precision)
-  (let* ((rslt  (or dest (make-result-array ny nx precision)))
-         (vrslt (vec rslt))
-         (arrsiz (* nx ny)))
-    (do ((cix 0 (+ cix 2))
-         (rix 0 (1+ rix)))
-        ((>= rix arrsiz) rslt)
-      (setf (aref vrslt rix)
-            (coerce
-             (db20 (complex (fli:dereference csrc :index cix)
-                            (fli:dereference csrc :index (1+ cix))))
-             precision))
-      )))
+(defun convert-complex-cvect-power-to-array (&rest args)
+  (apply #'delegate-to-FFT
+         #'fft:convert-complex-cvect-power-to-array args))
 
-(defun convert-complex-cvect-phases-to-array (csrc ny nx
-                                                   &key
-                                                   dest
-                                                   precision)
-  (let* ((rslt  (or dest (make-result-array ny nx precision)))
-         (vrslt (vec rslt))
-         (arrsiz (* nx ny)))
-    (do ((cix 0 (+ cix 2))
-         (rix 0 (1+ rix)))
-        ((>= rix arrsiz) rslt)
-      (setf (aref vrslt rix)
-            (coerce
-             (phase (complex (fli:dereference csrc :index cix)
-                             (fli:dereference csrc :index (1+ cix))))
-             precision))
-      )))
+(defun convert-complex-cvect-magnitudes-db-to-array (&rest args)
+  (apply #'delegate-to-FFT
+         #'fft:convert-complex-cvect-magnitudes-db-to-array args))
 
-(defun convert-complex-cvect-phases-deg-to-array (csrc ny nx
-                                                   &key
-                                                   dest
-                                                   precision)
-  (let* ((rslt  (or dest (make-result-array ny nx precision)))
-         (vrslt (vec rslt))
-         (arrsiz (* nx ny)))
-    (do ((cix 0 (+ cix 2))
-         (rix 0 (1+ rix)))
-        ((>= rix arrsiz) rslt)
-      (setf (aref vrslt rix)
-            (coerce
-             (phase-deg
-              (complex (fli:dereference csrc :index cix)
-                       (fli:dereference csrc :index (1+ cix))))
-             precision))
-      )))
+(defun convert-complex-cvect-phases-to-array (&rest args)
+  (apply #'delegate-to-FFT
+         #'fft:convert-complex-cvect-phases-to-array args))
+
+(defun convert-complex-cvect-phases-deg-to-array (&rest args)
+  (apply #'delegate-to-FFT
+         #'fft:convert-complex-cvect-phases-deg-to-array args))
 
 #|
 (defun tst (arr)
@@ -494,29 +289,6 @@
           ))
       )))
 
-#|
-(defun z2z (arr dir
-                &key
-                (precision :single-float)
-                dest)
-  (multiple-value-bind (ny nx) (check-dimensions arr)
-    (multiple-value-bind (ctype ltype) (effective-ctype precision)
-      (fli:with-dynamic-foreign-objects ()
-        (let ((cdst (fli:allocate-dynamic-foreign-object
-                     :type   ctype
-                     :nelems (* 2 nx ny))))
-          (copy-array-to-complex-cvect arr cdst ny nx 
-                                       :precision ltype)
-          (if (eq ctype :double)
-              (fft:z2zfft2d nx ny cdst cdst dir)
-            (fft:c2cfft2d nx ny cdst cdst dir))
-          (convert-complex-cvect-to-array cdst ny nx
-                                          :dest dest
-                                          :precision ltype))
-        ))
-    ))
-|#
-
 ;; --------------------------------------------------------------
 ;; fast routines for split-complex FFT requirements
 
@@ -535,16 +307,16 @@
                                             :element-type type
                                             :displaced-to (fft-buffer-r tmp)
                                             :displaced-index-offset (fft-buffer-roff tmp))))
-    (values (fft-buffer-r tmp) (fft-buffer-roff tmp)
-            (fft-buffer-i tmp) (fft-buffer-ioff tmp))
+    (values (fft-buffer-r tmp) (fft-buffer-roff tmp) (fft-buffer-pr tmp)
+            (fft-buffer-i tmp) (fft-buffer-ioff tmp) (fft-buffer-pi tmp))
     ))
 
-(defun d-copy-array-to-split-complex-cvect (arr dst-r roff dst-i ioff ny nx nya nxa)
+(defun do-copy-array-to-split-complex-cvect (type arr dst-r roff dst-i ioff ny nx nya nxa)
   (declare (optimize (float 0) (safety 0) (speed 3)))
-  (declare (type (array double-float (*)) dst-r dst-i))
   (declare (type fixnum ny nx nya nxa roff ioff))
   (let ((ny*nx   (the fixnum (* ny nx)))
-        (nya*nxa (the fixnum (* nya nxa))))
+        (nya*nx  (the fixnum (* nya nx)))
+        (zero    (coerce 0 type)))
     (declare (fixnum ny*nx nya*nxa))
     (do ((iy        0    (the fixnum (1+ iy)))
          (src-off   0    (the fixnum (+ src-off nxa)))
@@ -552,36 +324,29 @@
          (dsti-off  ioff (the fixnum (+ dsti-off nx))))
         ((>= iy nya))
       (declare (fixnum iy src-off dst-off))
-      (dotimes (ix nxa)
-        (declare (fixnum ix))
-        (let ((v (row-major-aref arr (the fixnum (+ src-off ix)))))
-          (setf (aref dst-r (the fixnum (+ dstr-off ix)))
-                (coerce (realpart v) 'double-float)
-                (aref dst-i (the fixnum (+ dsti-off ix)))
-                (coerce (imagpart v) 'double-float))))
-      (when (> nx nxa)
-        (fill dst-r 0d0 :start (the fixnum (+ dstr-off nxa)) :end (the fixnum (+ dstr-off nx)))
-        (fill dst-i 0d0 :start (the fixnum (+ dsti-off nxa)) :end (the fixnum (+ dsti-off nx)))
+      (let ((vsrc (vec arr :offset src-off :size nxa)))
+        (fft:do-copy-array-to-split-complex-cvect type vsrc dst-r dstr-off dst-i dsti-off nx nxa)
         ))
     (when (> ny nya)
-      (fill dst-r 0d0 :start (+ nya*nxa roff) :end (+ ny*nx roff))
-      (fill dst-i 0d0 :start (+ nya*nxa ioff) :end (+ ny*nx ioff)))
+      (fill dst-r zero :start (+ nya*nx roff) :end (+ ny*nx roff))
+      (fill dst-i zero :start (+ nya*nx ioff) :end (+ ny*nx ioff)))
     ))
-
-(defun d-convert-split-complex-cvect-to-array (src-r roff src-i ioff ny nx dest)
+  
+(defun do-convert-split-complex-cvect-to-array (type src-r roff src-i ioff ny nx dest)
   (declare (optimize (float 0) (safety 0) (speed 3) (debug 0)))
-  (declare (type (array double-float (*)) src-r src-i))
   (declare (type fixnum ny nx roff ioff))
-  (um:bind*
-      ((ans   (or dest (make-complex-result-array ny nx 'double-float)))
-       (ny*nx (the fixnum (* ny nx)))
-       (:declare (fixnum (ny*nx))))
-    (dotimes (ix ny*nx)
-      (declare (fixnum ix))
-      (setf (row-major-aref ans ix)
-            (complex (aref src-r (+ ix roff))
-                     (aref src-i (+ ix ioff)))))
+  (let* ((ans  (or dest (make-complex-result-array ny nx type)))
+         (vans (vec ans)))
+    (fft:do-convert-split-complex-cvect-to-array type src-r roff src-i ioff (* nx ny) vans)
     ans))
+
+;; ------------------------------------------------------------------
+
+(defun d-copy-array-to-split-complex-cvect (&rest args)
+  (apply #'do-copy-array-to-split-complex-cvect 'double-float args))
+
+(defun d-convert-split-complex-cvect-to-array (&rest args)
+  (apply #'do-convert-split-complex-cvect-to-array 'double-float args))
 
 (defun unsafe-z2z (arr dir ny nx nya nxa dest)
   (declare (optimize (float 0) (safety 0) (speed 3)))
@@ -598,49 +363,11 @@
 
 ;; --------------------------------------------------------------
 
-(defun s-copy-array-to-split-complex-cvect (arr dst-r roff dst-i ioff ny nx nya nxa)
-  (declare (optimize (float 0) (safety 0) (speed 3) (debug 0)))
-  (declare (type (array single-float (*)) dst-r dst-i))
-  (declare (type fixnum ny nx nya nxa))
-  (let ((ny*nx   (* ny nx))
-        (nya*nxa (* nya nxa)))
-    (declare (fixnum ny*nx nya*nxa))
-    (do ((iy       0    (the fixnum (1+ iy)))
-         (src-off  0    (the fixnum (+ src-off nxa)))
-         (dstr-off roff (the fixnum (+ dstr-off nx)))
-         (dsti-off ioff (the fixnum (+ dsti-off nx))))
-        ((>= iy nya))
-      (declare (fixnum iy src-off dst-off))
-      (dotimes (ix nxa)
-        (declare (fixnum ix))
-        (let ((v (row-major-aref arr (the fixnum (+ src-off ix)))))
-          (setf (aref dst-r (the fixnum (+ dstr-off ix)))
-                (coerce (realpart v) 'single-float)
-                (aref dst-i (the fixnum (+ dsti-off ix)))
-                (coerce (imagpart v) 'single-float))))
-      (when (> nx nxa)
-        (fill dst-r 0e0 :start (the fixnum (+ dstr-off nxa)) :end (the fixnum (+ dstr-off nx)))
-        (fill dst-i 0e0 :start (the fixnum (+ dsti-off nxa)) :end (the fixnum (+ dsti-off nx)))
-        ))
-    (when (> ny nya)
-      (fill dst-r 0e0 :start (+ nya*nxa roff) :end (* ny*nx roff))
-      (fill dst-i 0e0 :start (+ nya*nxa ioff) :end (* ny*nx ioff)))
-    ))
+(defun s-copy-array-to-split-complex-cvect (&rest args)
+  (apply #'do-copy-array-to-split-complex-cvect 'single-float args))
 
-(defun s-convert-split-complex-cvect-to-array (src-r roff src-i ioff ny nx dest)
-  (declare (optimize (float 0) (safety 0) (speed 3)))
-  (declare (type (array single-float (*)) src-r src-i))
-  (declare (type fixnum ny nx roff ioff))
-  (um:bind*
-      ((ans   (or dest (make-complex-result-array ny nx 'single-float)))
-       (ny*nx (the fixnum (* ny nx)))
-       (:declare (fixnum (ny*nx))))
-    (dotimes (ix ny*nx)
-      (declare (fixnum ix))
-      (setf (row-major-aref ans ix)
-            (complex (aref src-r (+ ix roff))
-                     (aref src-i (+ ix ioff)))))
-    ans))
+(defun s-convert-split-complex-cvect-to-array (&rest args)
+  (apply #'do-convert-split-complex-cvect-to-array 'single-float args))
 
 (defun unsafe-c2c (arr dir ny nx nya nxa dest)
   (declare (optimize (float 0) (safety 0) (speed 3)))

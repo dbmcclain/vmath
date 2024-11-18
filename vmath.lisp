@@ -3,9 +3,18 @@
 ;; DM/MCFA  08/99
 ;; ---------------------------------------------------------------
 
-(in-package "VECTORIZED-MATH")
+(in-package #:com.ral.vectorized-math)
 
 ;; ---------------------------------------------------------------
+
+(defun horner (v x)
+  ;; accept of sequence of coeffs in increasing degree
+  (reduce (lambda (c acc)
+            (+ c (* x acc)))
+          v
+          :initial-value 0.0
+          :from-end t))
+
 (defmethod size-of ((v vector))
   ;; returns only the used size of v when v is possibly
   ;; an adjustable array with a larger total size but where
@@ -34,12 +43,26 @@
 		(gensym pref))
 	    args)))
 
-(defun make-overlay-vector (arr)
-  (if (vectorp arr)
-      arr
-    (make-array (array-total-size arr)
-                :displaced-to arr
-                :element-type (array-element-type arr))))
+(defgeneric make-overlay-vector (arr &key start end)
+  (:method ((vec vector) &key (start 0 start-present-p) (end (length vec) end-present-p))
+   (if (or start-present-p end-present-p)
+       (make-array (- end start)
+                   :element-type (array-element-type vec)
+                   :displaced-to vec
+                   :displaced-index-offset start)
+     ;; else
+     vec))
+  (:method ((lst list) &key (start 0) (end nil end-present-p))
+   (let ((vec (coerce (nthcdr start lst) 'vector)))
+     (if end-present-p
+         (make-overlay-vector vec :end end)
+       vec)))
+  (:method ((arr array) &key (start 0) (end (array-total-size arr)))
+   (make-array (- end start)
+               :displaced-to arr
+               :displaced-index-offset start
+               :element-type (array-element-type arr)
+               )) )
 
 (defun pair-up-gensyms-with-overlay-vectors (gargs args)
   (mapcar #'(lambda (garg arg)
@@ -121,7 +144,8 @@
   (let ((args  (mapcar #'make-overlay-vector args))
         (vdest (make-overlay-vector dest)))
     (apply #'map-into vdest fn args)
-    dest))
+    dest
+    ))
 
 (defun vwise (fn &rest args)
   (let ((args (mapcar #'make-overlay-vector args)))
@@ -275,7 +299,7 @@
   (let ((v (make-array nel :element-type 'single-float)))
     (declare (type (simple-array single-float (*)) v))
     (do ((ix 0 (1+ ix))
-         (val (- (/ (coerce nel 'single-float) 2.0F0))
+         (val (- (/ (coerce (1- nel) 'single-float) 2.0F0))
               (+ val 1.0F0)))
         ((>= ix nel) v)
       (declare (type fixnum ix)
@@ -286,7 +310,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (require "mt-random"))
 
-(defun unoise (nel limit &optional (random-state lw:*mt-random-state*))
+(defun unoise (nel &key (limit 1.0f0) (random-state lw:*mt-random-state*))
+  ;; Uniform variates between 0 and LIMIT
   (declare (type fixnum nel))
   (declare (special lw:*mt-random-state*))
   (declare (optimize (speed  3)
@@ -637,6 +662,8 @@
 |#
 
 (defun slice (arr dim &rest ixs)
+  ;; returns a 1D slice along any dimension, from an array of
+  ;; arbitrary rank > 0
   (let* ((pre  (subseq ixs 0 dim))
          (post (subseq ixs (1+ dim))))
     (map 'vector
@@ -750,19 +777,22 @@
 
 (defun percentile (arr pc)
   (let* ((vec   (vector-of arr))
-         (len   (length vec))
-         (limit (1- len))
-         (ixs   (iramp len))
-         (index (round (* limit pc) 100)))
-    (values (select-kth vec ixs index 0 limit) index)))
+         (len   (length vec)))
+    (when (plusp len)
+      (let* ((limit (1- len))
+             (ixs   (iramp len))
+             (index (round (* limit pc) 100)))
+        (values (select-kth vec ixs index 0 limit) index)
+        ))))
       
 (defun median (arr)
   (percentile arr 50))
 
 (defun mad (arr &optional (med (median arr)))
-  (median (elementwise (arr)
-                       (abs (- arr med)))
-          ))
+  (let ((vec (make-overlay-vector arr)))
+    (median (vectorwise (vec)
+                        (abs (- vec med)))
+            )))
 
 ;; ---------------------------------------------------------------------
 #+:cormanlisp

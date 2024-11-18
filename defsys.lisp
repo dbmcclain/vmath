@@ -1,7 +1,6 @@
 
 (defpackage vector-ops
   (:use common-lisp)
-  (:nicknames vo vop vops)
   (:export
    #:vec
    #:blit

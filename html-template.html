@@ -3,7 +3,7 @@
 
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
-  <title>VECTORIZED-MATH - a library for vectorized math</title>
+  <title>COM.RAL.VECTORIZED-MATH - a library for vectorized math</title>
   <style type="text/css">
   pre { padding:5px; background-color:#e0e0e0 }
   h3, h4 { text-decoration: underline; }
@@ -25,11 +25,11 @@
 
 <body bgcolor=white>
 
-<h2> VECTORIZED-MATH - a library for vectorized math</h2>
+<h2> COM.RAL.VECTORIZED-MATH - a library for vectorized math</h2>
 
 <br>&nbsp;<br><h3><a class=none name="contents">Contents</a></h3>
 <ol>
-  <li><a href="#dictionary">The VECTORIZED-MATH dictionary</a>
+  <li><a href="#dictionary">The COM.RAL.VECTORIZED-MATH dictionary</a>
     <ol>
       <li><a href="#acanon"><code>acanon</code></a>
       <li><a href="#bipolar-framp"><code>bipolar-framp</code></a>
@@ -77,6 +77,7 @@
       <li><a href="#shifted-bipolar-xplane"><code>shifted-bipolar-xplane</code></a>
       <li><a href="#shifted-bipolar-yplane"><code>shifted-bipolar-yplane</code></a>
       <li><a href="#shifth"><code>shifth</code></a>
+      <li><a href="#simplex"><code>simplex</code></a>
       <li><a href="#sinc"><code>sinc</code></a>
       <li><a href="#slice"><code>slice</code></a>
       <li><a href="#split"><code>split</code></a>
@@ -91,6 +92,7 @@
       <li><a href="#vrotl"><code>vrotl</code></a>
       <li><a href="#vrotr"><code>vrotr</code></a>
       <li><a href="#vshifth"><code>vshifth</code></a>
+      <li><a href="#without-denormals"><code>without-denormals</code></a>
       <li><a href="#wtmean"><code>wtmean</code></a>
       <li><a href="#wtstdev"><code>wtstdev</code></a>
       <li><a href="#wtvariance"><code>wtvariance</code></a>
@@ -100,7 +102,7 @@
   <li><a href="#ack">Acknowledgements</a>
 </ol>
 
-<br>&nbsp;<br><h3><a class=none name="dictionary">The VECTORIZED-MATH dictionary</a></h3>
+<br>&nbsp;<br><h3><a class=none name="dictionary">The COM.RAL.VECTORIZED-MATH dictionary</a></h3>
 
 
 
@@ -656,6 +658,18 @@
 <!-- End of entry for SHIFTH -->
 
 
+<!-- Entry for SIMPLEX -->
+
+<p><br>[Function]<br><a class=none name='simplex'><b>simplex</b> <i>errfn v <tt>&amp;key</tt> nmax tol</i> =&gt; <i>result</i></a>
+<blockquote><br>
+
+
+
+</blockquote>
+
+<!-- End of entry for SIMPLEX -->
+
+
 <!-- Entry for SINC -->
 
 <p><br>[Function]<br><a class=none name='sinc'><b>sinc</b> <i>x</i> =&gt; <i>result</i></a>
@@ -802,7 +816,7 @@
 
 <!-- Entry for VECTOR-OF -->
 
-<p><br>[Method]<br><a class=none><b>vector-of</b> <i>(x cons)</i> =&gt; <i>result</i></a>
+<p><br>[Method]<br><a class=none><b>vector-of</b> <i>(x list)</i> =&gt; <i>result</i></a>
 <blockquote><br>
 
 
@@ -872,6 +886,18 @@
 <!-- End of entry for VSHIFTH -->
 
 
+<!-- Entry for WITHOUT-DENORMALS -->
+
+<p><br>[Macro]<br><a class=none name='without-denormals'><b>without-denormals</b> <i>declaration* statement*</i> =&gt; <i>result</i></a>
+<blockquote><br>
+
+
+
+</blockquote>
+
+<!-- End of entry for WITHOUT-DENORMALS -->
+
+
 <!-- Entry for WTMEAN -->
 
 <p><br>[Function]<br><a class=none name='wtmean'><b>wtmean</b> <i>wts arr</i> =&gt; <i>result</i></a>
@@ -936,6 +962,7 @@
 
 <p>
 This documentation was prepared with a locally modified version of Edi Weitz's <a href="http://weitz.de/documentation-template/">DOCUMENTATION-TEMPLATE</a>.
+This document is Copyright (C) 2008-2011 by SpectroDynamics, LLC. All rights reserved.
 </p>
 </body>
 </html>

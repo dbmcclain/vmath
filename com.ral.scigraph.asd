@@ -1,5 +1,5 @@
 
-(asdf:defsystem "scigraph"
+(asdf:defsystem "com.ral.scigraph"
   :description "scigraph: a graphical plotting system"
   :version     "1.0"
   :author      "D.McClain <dbm@spectrodynamics.com>"
@@ -20,5 +20,5 @@
                
                (:file "surfplot")
                (:file "images"))
-  :depends-on  ("vmath"
-                #+:MACOSX "aquaterm"))
+  :depends-on  ("com.ral.vmath"
+                #+:MACOSX "com.ral.aquaterm"))

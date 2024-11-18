@@ -1,15 +1,15 @@
 
-(defpackage :burg
-  (:use :cl)
+(defpackage #:com.ral.burg
+  (:use #:cl)
   (:export
-   :memcof
-   :predict
-   :filter
-   :blit
-   :vec
+   #:memcof
+   #:predict
+   #:filter
+   #:blit
+   #:vec
    ))
 
-(in-package :burg)
+(in-package #:com.ral.burg)
 
 ;; -------------------------------------------------
 ;; Burg AR Analysis

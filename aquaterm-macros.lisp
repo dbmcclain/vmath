@@ -1,5 +1,5 @@
 
-(in-package "AQUATERM")
+(in-package #:com.ral.aquaterm)
 
 (defmacro by-proxy (&body body)
   `(aqt::proxy-request #'(lambda () 

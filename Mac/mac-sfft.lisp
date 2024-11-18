@@ -3,108 +3,9 @@
 ;; DM/MCFA  08/99
 ;; --------------------------------------------------
 
-(in-package :SFFT)
+(in-package #:com.ral.sfft)
 
 ;; ------------------------------------------------------------------
-
-(defstruct (fft-buffer
-            (:constructor make-fft-buf))
-  nx
-  r i
-  roff ioff
-  hr
-  pr pi)
-
-(defun half-dim (n)
-  (1+ (truncate n 2)))
-
-(defun nfloats (nb)
-  (assert (zerop (logand nb 3))) ;; assure that our offsets are multiples of 4 bytes
-  (truncate nb 4))
-
-(defun make-fft-buffer (nx)
-  (let* ((nxa   (max 8 (um:ceiling-pwr2 nx)))
-         (rarr  (make-array (+ nxa 3) :element-type 'single-float :allocation :static))
-         (iarr  (make-array (+ nxa 7) :element-type 'single-float :allocation :static))
-         (roff  (nfloats (fft:get-align16-offset rarr)))
-         (ioff  (nfloats (fft:get-align16-offset iarr)))
-         (hrarr (make-array (half-dim nxa)
-                            :element-type 'single-float
-                            :displaced-to rarr
-                            :displaced-index-offset roff)))
-    (if (zerop (logand (- (+ (* 4 ioff) (sys:object-address iarr))
-                          (+ (* 4 roff) (sys:object-address rarr)))
-                       (1- 1024)))
-        ;; offset ioff by another 4 to avoid the Pentium quirk when two buffer addresses differ
-        ;; by multiple of 1024 bytes.
-        (incf ioff 4)) ;; bump by another 16 bytes
-    (let ((ptr  (+ (* roff 4) (get-c-address rarr)))
-          (pti  (+ (* ioff 4) (get-c-address iarr))))
-      (assert (zerop (logand 15 ptr)))
-      (assert (zerop (logand 15 pti)))
-      
-      (make-fft-buf
-       :nx   nxa
-       :r    rarr
-       :roff roff
-       :i    iarr
-       :ioff ioff
-       :hr   hrarr
-       :pr   ptr
-       :pi   pti)
-      )))
-
-(defun get-real (fftbuf)
-  (values (fft-buffer-r fftbuf) (fft-buffer-roff fftbuf) (fft-buffer-pr fftbuf)))
-
-(defun get-imag (fftbuf)
-  (values (fft-buffer-i fftbuf) (fft-buffer-ioff fftbuf) (fft-buffer-pi fftbuf)))
-
-(defmethod set-real (fftbuf (arr vector))
-  (replace (fft-buffer-r fftbuf) arr
-           :start1 (fft-buffer-roff fftbuf)))
-
-(defmethod set-real (fftbuf (val single-float))
-  (fill (fft-buffer-r fftbuf) val :start (fft-buffer-roff fftbuf)))
-
-(defmethod set-imag (fftbuf (arr vector))
-  (replace (fft-buffer-i fftbuf) arr
-           :start1 (fft-buffer-ioff fftbuf)))
-
-(defmethod set-imag (fftbuf (val single-float))
-  (fill (fft-buffer-i fftbuf) val :start (fft-buffer-ioff fftbuf)))
-
-(defun copy-fft-buffer-contents (src dst)
-  (replace (fft-buffer-r dst) (fft-buffer-r src)
-           :start1 (fft-buffer-roff dst)
-           :start2 (fft-buffer-roff src))
-  (replace (fft-buffer-i dst) (fft-buffer-i src)
-           :start1 (fft-buffer-ioff dst)
-           :start2 (fft-buffer-ioff src)))
-
-(defun pwr (r i)
-  (declare (type single-float r i))
-  (+ (* r r) (* i i)))
-
-(defun ampl (r i)
-  (declare (type single-float r i))
-  (sqrt (pwr r i)))
-
-(defun db10 (r i)
-  (declare (type single-float r i))
-  (* 10f0 (log (pwr r i) 10f0)))
-
-(defun rtod (x)
-  (declare (type single-float x))
-  (float (* #. (/ 180f0 pi) x) 1f0))
-
-(defun phs-deg (r i)
-  (declare (type single-float r i))
-  (rtod (phs r i)))
-
-(defun phs (r i)
-  (declare (type single-float r i))
-  (atan i r))
 
 ;; -----------------------------------------------------------
 
@@ -188,6 +89,32 @@
                                    (aref iarr (+ ix ioff)))))
     dst))
     
+;; --------------------------------------------------------------
+
+(defun pwr (r i)
+  (declare (type single-float r i))
+  (+ (* r r) (* i i)))
+
+(defun ampl (r i)
+  (declare (type single-float r i))
+  (sqrt (pwr r i)))
+
+(defun db10 (r i)
+  (declare (type single-float r i))
+  (* 10f0 (log (pwr r i) 10f0)))
+
+(defun rtod (x)
+  (declare (type single-float x))
+  (float (* #. (/ 180f0 pi) x) 1f0))
+
+(defun phs-deg (r i)
+  (declare (type single-float r i))
+  (rtod (phs r i)))
+
+(defun phs (r i)
+  (declare (type single-float r i))
+  (atan i r))
+
 ;; --------------------------------------------------------------
 
 (defun fwd-magnitude (arr &key dest)

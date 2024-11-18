@@ -8,7 +8,7 @@
 ;;; Derived from file : "C:\\TEMP\\PCL188.h"
 ;;; Hand edited for module linkage DM/MCFA 12/01
 
-(defvar *fftx-library* (translate-logical-pathname "PROJECTS:DYLIB;fftx.dll"))
+(defvar *fftx-library* (translate-logical-pathname "PROJECTS:LIB;fftx.dll"))
 
 "linkage-specifier -> \"C\" (NIL NIL) "
 (fli:define-foreign-function (getversionstring

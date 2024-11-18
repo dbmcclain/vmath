@@ -3,7 +3,7 @@
 ;; DM/MCFA  08/99
 ;; -----------------------------------------------------------
 
-(in-package :SURFACE-PLOTS)
+(in-package #:com.ral.surface-plots)
 
 (defstruct vpa  ;; viewpoint angles
   (cis-theta (cis 0) :type complex)

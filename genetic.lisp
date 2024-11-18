@@ -1,10 +1,10 @@
 
-(defpackage :genetic
+(defpackage #:com.ral.genetic
   (:use :cl)
   (:export
    ))
 
-(in-package :genetic)
+(in-package #:com.ral.genetic)
 
 (defstruct gene-pool
   nchromosomes

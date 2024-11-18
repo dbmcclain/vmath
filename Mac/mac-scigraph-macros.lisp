@@ -1,6 +1,6 @@
 ;; scigraph-for-mac-macros.lisp
 ;; 
-(in-package "SCIGRAPH")
+(in-package #:com.ral.scigraph)
 
 (defmacro by-proxy (&body body)
   `(sg::proxy-request #'(lambda ()

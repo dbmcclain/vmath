@@ -3,13 +3,13 @@
 ;; DM/RAL  11/10
 ;; -------------------------------------------------------
 
-(defpackage :lmfit
+(defpackage #:com.ral.lmfit
   (:use #:common-lisp)
   (:export
    #:fit
    #:fitnd))
 
-(in-package :lmfit)
+(in-package #:com.ral.lmfit)
 
 ;; ------------------------------------------------------------
 ;; Levenberg-Marquardt Nonlinear LSQ Fitting

@@ -1,5 +1,5 @@
 
-(in-package :vector-ops)
+(in-package #:com.ral.vector-ops)
 
 ;; --------------------------------------------------------
 ;; Vector Routines

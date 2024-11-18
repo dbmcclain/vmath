@@ -1,9 +1,31 @@
 
 ;; (in-package #:CL-USER)
 
-(defpackage :vector-ops
+(project:defproject
+ (#:fft              #:com.ral.fft)
+ (#:sfft             #:com.ral.sfft)
+ (#:dfft             #:com.ral.dfft)
+ (#:fftt2d           #:com.ral.fft2d)
+ (#:interpolation    #:interp)
+ (#:interp           #:com.ral.interpolation)
+ (#:integration      #:com.ral.integration)
+ (#:roots            #:com.ral.roots)
+ (#:aquaterm         #:com.ral.aquaterm)
+ (#:aqt              #:aquaterm)
+ (#:scigraph         #:com.ral.scigraph)
+ (#:sg               #:scigraph)
+ (#:surface-plots    #:com.ral.surface-plots)
+ (#:surf             #:surface-plots)
+ (#:vm               #:vmath)
+ (#:vmath            #:com.ral.vectorized-math)
+ (#:image-processing #:com.ral.image-processing)
+ (#:photometry       #:com.ral.photometry)
+ (#:kaiser           #:com.ral.kaiser)
+ (#:matrix           #:com.ral.matrix-ops)
+ (#:nrglue           #:com.ral.nrglue))
+ 
+(defpackage #:com.ral.vector-ops
   (:use #:common-lisp)
-  (:nicknames #:vo #:vop #:vops)
   (:export
    #:vec
    #:blit
@@ -39,7 +61,7 @@
    #:vwrap
    ))
 
-(defpackage :fft
+(defpackage #:com.ral.fft
   (:use #:common-lisp)
   (:export
    #:$fftw-forward
@@ -65,14 +87,27 @@
    #:c2cfft2d
    #:unsafe-c2cfft2d
 
-   #:make-fft-buffer
+   #:twids
+   #:twids-p
+   #:make-twids
+   #:twids-expir
+   #:twids-refct
+   #:twids-prec
+   #:twids-log2n
+   #:twids-psetup
+   
+   #:fft-buffer
    #:fft-buffer-p
+   #:make-fft-buffer
    #:fft-buffer-r
+   #:fft-buffer-pr
    #:fft-buffer-roff
    #:fft-buffer-i
+   #:fft-buffer-pi
    #:fft-buffer-ioff
    #:fft-buffer-hr
    #:fft-buffer-nx
+   #:fft-buffer-ny
    #:get-real
    #:get-imag
    #:set-real
@@ -100,21 +135,64 @@
    #:get-stmp
    #:get-dtmp
    #:get-c-address
+
+   #:half-dim
+   #:copy-fft-buffer-contents
+   #:effective-type
+   #:effective-array-element-type
+   #:effective-ctype
+   #:vec
+   #:convert-complex-cvect-to-array
+   #:convert-complex-cvect-magnitudes-to-array
+   #:convert-complex-cvect-power-to-array
+   #:convert-complex-cvect-magnitudes-db-to-array
+   #:convert-complex-cvect-phases-to-array
+   #:convert-complex-cvect-phases-deg-to-array
+   #:do-convert-split-complex-cvect-to-array
+   #:do-copy-array-to-split-complex-cvect
    ))
 
 #+:MACOSX
-(defpackage :fft2d
+(defpackage #:com.ral.fft2d
   (:use #:common-lisp)
-  (:export
+  (:import-from #:fft
+   #:half-dim
    #:make-fft-buffer
+   #:get-real
+   #:get-imag
+   #:set-real
+   #:set-imag
+   #:copy-fft-buffer-contents
+   #:effective-type
+   #:effective-array-element-type
+   #:effective-ctype
+   #:vec
+   #:fft-buffer
    #:fft-buffer-p
    #:fft-buffer-r
+   #:fft-buffer-pr
    #:fft-buffer-roff
    #:fft-buffer-i
+   #:fft-buffer-pi
    #:fft-buffer-ioff
    #:fft-buffer-hr
-   #:fft-buffer-ny
    #:fft-buffer-nx
+   #:fft-buffer-ny
+   )
+  (:export
+   #:fft-buffer
+   #:fft-buffer-p
+   #:make-fft-buffer
+   #:make-fft-buf
+   #:fft-buffer-r
+   #:fft-buffer-pr
+   #:fft-buffer-roff
+   #:fft-buffer-i
+   #:fft-buffer-pi
+   #:fft-buffer-ioff
+   #:fft-buffer-hr
+   #:fft-buffer-nx
+   #:fft-buffer-ny
    #:get-real
    #:get-imag
    #:set-real
@@ -131,14 +209,34 @@
    #:siglab_sbFFT))
 
 #+:MACOSX
-(defpackage :sfft
+(defpackage #:com.ral.sfft
   (:use #:common-lisp)
+  (:import-from #:fft
+   #:get-real
+   #:get-imag
+   #:copy-fft-buffer-contents
+   #:fft-buffer
+   #:fft-buffer-p
+   #:fft-buffer-r
+   #:fft-buffer-pr
+   #:fft-buffer-roff
+   #:fft-buffer-i
+   #:fft-buffer-pi
+   #:fft-buffer-ioff
+   #:fft-buffer-hr
+   #:fft-buffer-nx
+   #:fft-buffer-ny
+   #:get-c-address
+   )
   (:export
+   #|
    #:make-fft-buffer
    #:fft-buffer-p
    #:fft-buffer-r
+   #:fft-buffer-pr
    #:fft-buffer-roff
    #:fft-buffer-i
+   #:fft-buffer-pi
    #:fft-buffer-ioff
    #:fft-buffer-hr
    #:fft-buffer-nx
@@ -146,6 +244,14 @@
    #:get-imag
    #:set-real
    #:set-imag
+   |#
+   #:pwr
+   #:ampl
+   #:db10
+   #:rtod
+   #:phs-deg
+   #:phs
+
    #:r2c
    #:c2r
    #:c2c
@@ -158,14 +264,35 @@
    #:fwd-phase-deg))
 
 #+:MACOSX
-(defpackage :dfft
+(defpackage #:com.ral.dfft
   (:use #:common-lisp)
+  (:import-from #:fft
+   #:get-real
+   #:get-imag
+   #:copy-fft-buffer-contents
+   #:set-imag
+   #:fft-buffer
+   #:fft-buffer-p
+   #:fft-buffer-r
+   #:fft-buffer-pr
+   #:fft-buffer-roff
+   #:fft-buffer-i
+   #:fft-buffer-pi
+   #:fft-buffer-ioff
+   #:fft-buffer-hr
+   #:fft-buffer-nx
+   #:fft-buffer-ny
+   #:get-c-address
+   )
   (:export
+   #|
    #:make-fft-buffer
    #:fft-buffer-p
    #:fft-buffer-r
+   #:fft-buffer-pr
    #:fft-buffer-roff
    #:fft-buffer-i
+   #:fft-buffer-pi
    #:fft-buffer-ioff
    #:fft-buffer-hr
    #:fft-buffer-nx
@@ -173,6 +300,14 @@
    #:get-imag
    #:set-real
    #:set-imag
+   |#
+   #:pwr
+   #:ampl
+   #:db10
+   #:rtod
+   #:phs-deg
+   #:phs
+   
    #:d2z
    #:z2d
    #:z2z
@@ -185,9 +320,8 @@
    #:fwd-phase-deg))
 
 #+:MACOSX
-(defpackage :aquaterm
+(defpackage #:com.ral.aquaterm
   (:use #:common-lisp)
-  (:nicknames #:aqt)
   (:export
    #:def-proxy-fli-function
    #:terminate
@@ -240,9 +374,8 @@
    #:align-bottom
    #:align-top ))
 
-(defpackage :scigraph
+(defpackage #:com.ral.scigraph
   (:use #:common-lisp)
-  (:nicknames #:sg)
   (:export
    #:tvscl
    #:plot
@@ -330,10 +463,10 @@
    #:get-next-event
    ))
 
-(defpackage :vectorized-math
-  (:use #:common-lisp #:vector-ops)
-  (:nicknames #:vmath #:vm)
+(defpackage #:com.ral.vectorized-math
+  (:use #:common-lisp #:com.ral.vector-ops)
   (:export
+   #:horner
    #:iramp
    #:framp
    #:dramp
@@ -396,6 +529,7 @@
    #:elementwise-reduce
    #:gensyms-for-args
    #:ixsort
+   #:make-overlay-vector
 
    #:require-same-shape
    #:require-same-size
@@ -411,8 +545,7 @@
    #:without-denormals
    ))
    
-(defpackage :surface-plots
-  (:nicknames #:surf #:surfplots)
+(defpackage #:com.ral.surface-plots
   (:use #:common-lisp)
   (:export
    #:plot-surface
@@ -428,9 +561,8 @@
    #:lamp-intensity
    ))
 
-(defpackage :image-processing
+(defpackage #:com.ral.image-processing
   (:use #:common-lisp)
-  (:nicknames #:img)
   (:export
    #:<image-array>
    #:<matrix-array>
@@ -479,15 +611,13 @@
    #:find-peak
    #:show-peak))
 
-(defpackage :photometry
-  (:use #:common-lisp)
-  (:nicknames #:phot)
+(defpackage #:com.ral.old-photometry
+  (:use #:common-lisp #:com.ral.actors)
   (:export
    #:photom))
 
-(defpackage #:interpolation
+(defpackage #:com.ral.interpolation
   (:use #:common-lisp)
-  (:nicknames #:interp)
   (:export
    #:linint
    #:polint
@@ -500,9 +630,8 @@
    #:monotonic-splint
    ))
 
-(defpackage #:integrate
+(defpackage #:com.ral.integrate
   (:use #:common-lisp)
-  (:nicknames #:integ)
   (:export
    #:trapm
    #:mtriple
@@ -511,7 +640,7 @@
    #:sub-array
    ))
 
-(defpackage #:roots
+(defpackage #:com.ral.roots
   (:use #:common-lisp)
   (:export
    #:find-root
@@ -524,21 +653,22 @@
    #:rtsafe
    ))
 
-(defpackage :kaiser
-  (:use :cl)
+(defpackage #:com.ral.kaiser
+  (:use #:cl)
   (:export
-   :kaiser-window
-   :sinc
-   :beta-factor
-   :compute-fir-filter-order
-   :bessel-i0
+   #:kaiser-window
+   #:sinc
+   #:beta-factor
+   #:compute-fir-filter-order
+   #:bessel-i0
    ))
 
 #|
 ;; generate HTML documentation
-(in-package :vmath)
+(in-package #:vmath)
+(asdf :doctools)
 (doctools:gen-docs
- :asdf-system-name :vmath
+ :asdf-system-name :com.ral.vmath
  :package-name     :vmath
  :directory        (translate-logical-pathname "PROJECTS:LISP;vmath;")
  :subtitle         "a library for vectorized math")

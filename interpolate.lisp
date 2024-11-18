@@ -1,5 +1,5 @@
 
-(in-package #:interpolation)
+(in-package #:com.ral.interpolation)
 
 ;; polynomial interpolation
 
@@ -146,7 +146,10 @@
    ))
 
 
-(defmethod spline ((xs vector) (ys vector) dy/dx-1 dy/dx-n) ;; -> <spine-data> object
+(defmethod spline ((xs vector) (ys vector)
+                   &optional
+                   (dy/dx-1 :natural)
+                   (dy/dx-n :natural)) ;; -> <spine-data> object
   ;; xs must be ascending: x1 < x2 < ... < xn
   ;; valuees of dy/dx-1 and dy/dx-n for first and last points can either be
   ;; numeric values or keyword :natural to force natural spline fits

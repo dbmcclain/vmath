@@ -5,9 +5,8 @@
 ;; Supports scalars, vectors, 2-D arrays, and matix objects
 ;; A matrix object is a vector of vectors.
 
-(defpackage :matrix-ops
+(defpackage #:com.ral.matrix-ops
   (:use #:common-lisp)
-  (:nicknames #:matrix #:mops)
   (:shadow
    #:abs #:trace #:sqrt
    #:+ #:* #:- #:/
@@ -80,7 +79,7 @@
    #:log
    ))
 
-(in-package :matrix-ops)
+(in-package #:com.ral.matrix-ops)
 
 ;; ----------------------------------------------------------
 ;; Matrix and associated operations
@@ -201,10 +200,13 @@
 
 ;; -------------------------------------
 
+(defgeneric copy (x &key fn))
+
 (defmethod copy (x &key (fn #'identity))
   (funcall fn x))
 
-(defmethod copy ((v vector) &key (fn #'identity))
+(defmethod copy ((v sequence) &key (fn #'identity))
+  ;; SEQUENCE - works on both vectors and lists
   (map 'vector fn v))
 
 (defmethod copy ((m matrix) &key (fn #'identity))
@@ -214,21 +216,98 @@
               (matrix-rows m))))
 
 
-(defun make-array-like (a)
-  (make-array (array-dimensions a)
-              :element-type (array-element-type a)))
+(defun make-array-like (a &rest args)
+  (apply #'make-array (array-dimensions a)
+         :element-type (array-element-type a)
+         args))
 
-(defmethod copy ((a array) &key (fn #'identity))
-  (let ((ans   (make-array-like a))
-        (nrows (nrows a))
-        (ncols (ncols a)))
-    (loop for row from 0 below nrows do
-          (loop for col from 0 below ncols do
-                (setf (cl:aref ans row col)
-                      (funcall fn (cl:aref a row col))) ))
-    ans))
+(defun overlay-vec (a)
+  (make-array (array-total-size a)
+              :element-type (array-element-type a)
+              :displaced-to a
+              :displaced-index-offset 0))
 
+(defmethod #1=copy ((a array) &key (fn #'identity))
+  (let* ((ans       (make-array-like a))
+         (hist      nil)  ;; past array-element-type history
+         (val       ans)) ;; discriminator bucket
+    (tagbody
+     again
+     (handler-bind
+         ((type-error (lambda (c)
+                        (declare (ignore c))
+                        (unless (eq val ans)
+                          ;; When val is ans, we had problems in the
+                          ;; function fn, not in the array SETF. Since
+                          ;; we just created ans, locally, there is no
+                          ;; way that fn could possibly know about it.
+                          ;;
+                          ;; Allow progressive element-type upgrades,
+                          ;; but prevent us from bouncing between two
+                          ;; alternate types.
+                          ;;
+                          ;; If we see that we have already been a
+                          ;; suitable type, then just go fully general
+                          ;; with boxed type T. That should end our
+                          ;; getting called here.
+                          ;;
+                          (let ((new-type (upgraded-array-element-type (type-of val))))
+                            (if (find-if (um:curry #'subtypep new-type) hist)
+                                ;; keep us from oscillating forever
+                                (setf new-type t)
+                              (push (array-element-type ans) hist))
+                            (setf ans (make-array (array-dimensions a)
+                                                  :element-type new-type))
+                            (go again)
+                            )))
+                      ))
+       (map-into (overlay-vec ans)
+                 (lambda (x)
+                   (setf val ans  ;; set up discriminator between fn and setf
+                         val (funcall fn x)))
+                 (overlay-vec a))
+       (return-from #1# ans)
+       ))
+    ))
 
+#|
+(let* ((vec (make-array 5
+                        :element-type 'double-float)))
+  (setf (cl:aref vec 0) 256))
+
+(let* ((vec (vm:framp 10))
+       (ans (copy vec :fn #'evenp)))
+  (values (type-of ans) ans))
+
+(let* ((vec (vm:framp 10))
+       (ans (copy vec :fn #'zerop)))
+  (values (type-of ans) ans))
+
+(let* ((vec (vm:framp 10))
+       (ans (copy vec :fn #'round)))
+  (values (type-of ans) ans))
+
+(let* ((vec (vm:framp 10))
+       (ans (copy vec :fn (lambda (x)
+                            (if (> x 4)
+                                (float x 1f0)
+                              (float x 1d0))))))
+  (values (type-of ans) ans))
+
+(let* ((vec (vm:framp 10))
+       (ans (copy vec :fn (constantly pi))))
+  (values (type-of ans) ans))
+
+(let* ((vec (vm:dramp 5))
+       (ans (copy vec :fn (constantly 1f0))))
+  (values (type-of ans) ans))
+
+(compute-applicable-methods #'copy (list (make-array 5 :element-type 'single-float)))
+(compute-applicable-methods #'copy (list (vector 1 2)))
+(compute-applicable-methods #'copy (list '(1 2 3)))
+(clos:class-precedence-list (list 1 2 3))
+
+ |#
 ;; -------------------------------------
 
 (defun identityi (x &rest ixs)

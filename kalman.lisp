@@ -3,7 +3,7 @@
 ;; DM/RAL  11/10
 ;; ---------------------------------------------------
 
-(defpackage :kalman
+(defpackage #:com.ral.kalman
   (:use #:common-lisp)
   (:export
    #:smooth
@@ -14,7 +14,7 @@
    #:update
    ))
 
-(in-package :kalman)
+(in-package #:com.ral.kalman)
 
 ;; -----------------------------------------------------------------
 ;; Kalman Filtering

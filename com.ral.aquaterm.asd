@@ -1,6 +1,6 @@
 
 #+:MAC
-(asdf:defsystem "aquaterm"
+(asdf:defsystem "com.ral.aquaterm"
   :description "aquaterm: an interface to the Aquaterm graphic display terminal"
   :version     "1.0"
   :author      "D.McClain <dbm@spectrodynamics.com>"
@@ -8,6 +8,6 @@
   :components  ((:file "packages")
                 (:file "aquaterm-macros")
                 (:file "aquaterm-dff" :depends-on ("aquaterm-macros")))
-  :depends-on  ("data-objects"
-                "regex"))
+  :depends-on  (;; "data-objects"
+                "com.ral.regex"))
 

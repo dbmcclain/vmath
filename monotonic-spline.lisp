@@ -1,5 +1,5 @@
 
-(in-package #:interpolation)
+(in-package #:com.ral.interpolation)
 
 (defclass <monotonic-spline-data> ()
   ((xs-vector   :accessor xs-vector  :initarg :xs)

@@ -1,7 +1,7 @@
 
-(in-package :vm)
+(in-package #:com.ral.vectorized-math)
 
-(defun #1=simplex (errfn v &key nmax (tol 1d-6))
+(defun #1=simplex (errfn v &key (nmax 1000) (tol 1d-6))
   (let* ((dim   (length v))
          (verts (cons v
                       (loop for ix from 0 below dim collect
@@ -30,7 +30,7 @@
         ;; check for convergence
         (if (every converged
                    (mapcar (um:compose #'abs (um:curry #'- (first errs))) (rest errs)))
-            (values (first verts) (first errs) count)
+            (return-from #1# (values (first verts) (first errs) count))
 
           ;; compute centroid of vertices and reflect the worst vertex in the opposite
           ;; direction from there, starting from the centroid position

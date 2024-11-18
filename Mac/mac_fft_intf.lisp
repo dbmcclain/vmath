@@ -3,7 +3,7 @@
  | PROCESSED FILE : D:\Projects\LispWorks\vmath\fft_intf.h
  |#
 
-(in-package :FFT)
+(in-package #:com.ral.fft)
 
 ;;; Derived from file : "C:\\TEMP\\PCL188.h"
 ;;; Hand edited for module linkage DM/MCFA 12/01
@@ -12,7 +12,7 @@
   (fli:register-module :fftlib
                        :real-name
                        (translate-logical-pathname
-                        "PROJECTS:DYLIB;libLispFFT.dylib")))
+                        "PROJECTS:LIB;libLispFFT.dylib")))
 
 ;; ------------------------------------------------------------
 (fli:define-foreign-function (getfftversionstring
@@ -297,7 +297,7 @@
 
 ;; --------------------------------------------------------
 
-(in-package :VMATH)
+(in-package #:com.ral.vectorized-math)
 
 (defvar *siglab-library*
   (fli:register-module :siglab

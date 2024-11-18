@@ -1,5 +1,5 @@
 
-(asdf:defsystem "vmath"
+(asdf:defsystem "com.ral.vmath"
   :description "vmath: a system for vectorized math"
   :version     "1.0"
   :author      "D.McClain <dbm@spectrodynamics.com>"
@@ -23,8 +23,9 @@
                 #+:MACOSX
                 (:MODULE "Mac"
                  :COMPONENTS ((:file "mac_fft_intf")
-                              (:file "fft-twids" :depends-on ("mac_fft_intf"))
+                              (:file "fft-structs")
                               (:file "mac-fft"   :depends-on ("mac_fft_intf"))
+                              (:file "fft-twids" :depends-on ("mac_fft_intf"))
                               (:file "mac-sfft")
                               (:file "mac-dfft")
                               (:file "mac-fft2d")
@@ -39,7 +40,7 @@
                 #+:MACOSX (:file "burg")
                 #+:MACOSX (:file "dgesvd"))
   :serial t
-  :depends-on  ("data-objects"
-                #+:WIN32 "safearrays"
-                #-:WIN32 "c-arrays"))
+  :depends-on  (
+                ;; "data-objects"
+                "com.ral.c-arrays"))
 

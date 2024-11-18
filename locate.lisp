@@ -1,5 +1,5 @@
 
-(in-package #:interpolation)
+(in-package #:com.ral.interpolation)
 
 (defmethod locate ((vec vector) (x real) &optional prev-index) ;; -> j
   ;; Bisection to locate value x in a sorted vector of values vec.

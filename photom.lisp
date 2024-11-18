@@ -1,33 +1,33 @@
 ;; photom.lisp -- Interactive stellar photometry
 ;; DM/MCFA  12/99
-;;
+;; - Upgraded to 2024 system models -- DM/RAL  2024/06/03 14:44:25 UTC
 
-(in-package "PHOTOMETRY")
+(in-package #:com.ral.old-photometry)
 
 ;; set the colormap to grays
 (defun init-colormap ()
-  (let ((r (vm:iramp 256)))
-    (plt:set-cmap r r r)))
+  (plt:set-cmap "B-W LINEAR"))
 
 (topgui:define-toplevel-app-interface interface-1 ()
   ((image  :accessor interface-image :initform nil))
   (:panes
 
    (image-display
-    capi:output-pane
+    plt:articulated-plotter-pane
     :accessor image-display
     :cursor :crosshair
+    
     :input-model
     '(
-      ("Control-c"    copy-to-clipboard)
-      ("Left"          move-left 1)
-      ("Right"         move-right 1)
-      ("Up"            move-up 1)
-      ("Down"          move-down 1)
-      ("Control-left"  move-left 10)
-      ("Control-right" move-right 10)
-      ("Control-up"    move-up 10)
-      ("Control-down"  move-down 10)
+      ;; ("Control-c"    copy-to-clipboard)
+      ((:gesture-spec "Left")          move-left 1)
+      ((:gesture-spec "Right")         move-right 1)
+      ((:gesture-spec "Up")            move-up 1)
+      ((:gesture-spec "Down")          move-down 1)
+      ((:gesture-spec "Control-left")  move-left 10)
+      ((:gesture-spec "Control-right") move-right 10)
+      ((:gesture-spec "Control-up")    move-up 10)
+      ((:gesture-spec "Control-down")  move-down 10)
       (#\z             set-ref-magnitude-from-kbd)
       (:motion         show-position)
       ((:button-3 :press)     set-ref-magnitude)
@@ -51,11 +51,11 @@
       |#
       )
     :display-callback 'redisplay-image
-    :min-width 640
+    :min-width  640
     :min-height 480)
 
    (color-bar-display
-    capi:output-pane
+    plt:plotter-pane
     :accessor color-bar-display
     :display-callback 'redraw-color-bar
     :min-width 9
@@ -64,7 +64,7 @@
     :max-height 256)
    
    (magn-image-display
-    capi:output-pane
+    plt:plotter-pane
     :accessor magn-image-display
     ;; :cursor :arrow
     :min-width (* 11 8)
@@ -253,27 +253,59 @@
                 ))
     (topgui:run-toplevel-app-interface 'interface-1
                                        :after #'startup)))
+;; -----------------------------------------------
+#|
+(photom)
+ |#
+;; -----------------------------------------------
+
+#|
 (defun copy-to-clipboard (&rest args)
   (declare (ignore args))
   (plt:copy-graphic-to-clipboard)
   (capi:display-message "image captured"))
+|#
+
+(defun image-med (img)
+  (let* ((vimg (make-array (array-total-size img)
+                           :element-type (array-element-type img)
+                           :displaced-to img)))
+    (values (vm:median vimg)
+            (vm:mad    vimg))
+    ))
 
 (defclass <image-array-x> ()
   ((data :accessor image-array-arena :initarg :arena)
-   (tint :accessor integration-time   :initarg  :tint)))
+   (tint :accessor integration-time  :initarg :tint)
+   (med  :accessor image-array-med   :initarg :med)
+   (mad  :accessor image-array-mad   :initarg :mad)
+   ))
 
 (defun make-image-x (arr tint)
-  (if (= (ca:carray-rank arr) 2)
-      (if (ca:is-float-array arr)
-          (make-instance '<image-array-x>
-		         :arena arr
-                         :tint  (or tint 1.0))
-        (let ((xarr (ca:convert-to-float arr :type :float)))
-          (ca:discard-carray arr)
-          (make-image-x xarr tint)))
-    (progn
-      (ca:discard-carray arr)
-      (error "flat 2-D array required"))))
+  (if (= (array-rank arr) 2)
+      (if (eql (array-element-type arr) 'single-float)
+          (multiple-value-bind (med mad)
+              (image-med arr)
+            (make-instance '<image-array-x>
+                           :arena arr
+                           :tint  (or tint 1.0)
+                           :med   med
+                           :mad   mad))
+        ;; else
+        (let* ((dims  (array-dimensions arr))
+               (tsize (reduce #'* dimensions))
+               (xarr  (make-array dims
+                                  :element-type 'single-float))
+               (vdst  (make-array tsize
+                                  :element-type 'single-float
+                                  :displaced-to xarr))
+               (vsrc (make-array tsize
+                                 :element-type (array-element-type arr))))
+          (loop for ix from 0 below tsize do
+                  (setf (aref vdst ix) (float (aref vsrc ix) 1f0)))
+          (make-image-x xarr tint)) )
+    ;; else
+    (error "flat 2-D array required")))
 
 #|
 (defmethod img:make-similar ((a <image-array-x>) arr)
@@ -288,101 +320,16 @@
 (defun set-interface-image (intf img)
   (setf (interface-image intf) img))
 
-(defun select-kth (vec ixs k left right)
-  (declare 
-   #+:lispworks 
-   (optimize (debug 1) (speed 3) (safety 0)) ;; what is this trying to achieve?
-   (type fixnum k left right)
-   (type (array fixnum 1) ixs))
-  (ca:with-row-major-access (p vec)
-    (labels ((ind-aref (ix)
-               ;; Corman Lisp does not yet handle DECLARE inside of (LABELS ...) (v/1.5 12/01)
-               #-:cormanlisp 
-               (declare (type fixnum ix))
-               (fli:dereference p :index (aref ixs ix))))
-      (let ((l   left)
-            (r   right))
-        (declare (type fixnum l r))
-        (tagbody
-         again-1
-         (let ((v (ind-aref k))
-               (i l)
-               (j r))
-           (declare (type fixnum i j))
-           (tagbody
-            again-2
-            (let ((ip (do ((ix i (1+ ix)))
-                          ((<= v (ind-aref ix)) ix)
-                        (declare (type fixnum ix))
-                      ))
-                  (jp (do ((ix j (1- ix)))
-                          ((>= v (ind-aref ix)) ix)
-                        (declare (type fixnum ix))
-                        )))
-              (declare (type fixnum ip jp))
-              (if (<= ip jp)
-                  (let ((ipp (1+ ip))
-                        (jpp (1- jp)))
-                    (declare (type fixnum ipp jpp))
-                    (rotatef (aref ixs ip) (aref ixs jp))
-                    (setf i ipp
-                          j jpp)
-                    (if (<= ipp jpp)
-                        (go again-2)))
-                (setf i ip
-                      j jp))
-              ))
-           (if (< j k) (setf l i))
-           (if (< k i) (setf r j))
-           (if (< l r) (go again-1))
-           )))
-      (values (ind-aref k) ixs))))
-  
-(defun percentiles (arr)
-  (let* ((len   (ca:carray-total-size arr))
-         (limit (1- len))
-         (ixs   (vm:iramp len))
-         (n50   (round (* 50 limit) 100))
-         (n01   (round limit 100))
-         (n05   (round (*  5 limit) 100))
-         (n10   (round (* 10 limit) 100))
-         (n25   (round (* 25 limit) 100))
-         (n75   (round (* 75 limit) 100))
-         (n90   (round (* 90 limit) 100))
-         (n95   (round (* 95 limit) 100))
-         (n99   (round (* 99 limit) 100))
-         (pc50  (select-kth arr ixs n50 0 limit))
-         (pc25  (select-kth arr ixs n25 0 n50))
-         (pc10  (select-kth arr ixs n10 0 n25))
-         (pc05  (select-kth arr ixs n05 0 n10))
-         (pc01  (select-kth arr ixs n01 0 n05))
-         (pc75  (select-kth arr ixs n75 n50 limit))
-         (pc90  (select-kth arr ixs n90 n75 limit))
-         (pc95  (select-kth arr ixs n95 n90 limit))
-         (pc99  (select-kth arr ixs n99 n95 limit)))
-    (list
-     :pc01 pc01
-     :pc05 pc05
-     :pc10 pc10
-     :pc25 pc25
-     :pc50 pc50
-     :pc75 pc75
-     :pc90 pc90
-     :pc95 pc95
-     :pc99 pc99)))
-
 (defun set-slider-bounds (intf img)
-  (let* ((pcs   (percentiles (image-array-arena img)))
-         (pc01  (truncate (getf pcs :pc01)))
-         (pc99  (max (truncate (getf pcs :pc99))
-                     (+ pc01 500)))
-         (range (* 2 (- pc99 pc01)))
+  (let* ((med    (image-array-med img))
+         (mad    (image-array-mad img))
          (offset-slider (offset-slider intf))
          (range-slider  (range-slider intf)))
-    (setf (capi:range-end range-slider)  range
-          (capi:range-end offset-slider) pc99
-          (capi:range-slug-start offset-slider) pc01
-          (capi:range-slug-start range-slider)  range)))
+    (setf (capi:range-end range-slider)         (+ med (* 100 mad))
+          (capi:range-end offset-slider)        (+ med (* 20 mad))
+          (capi:range-slug-start offset-slider) (- med (* 5 mad))
+          (capi:range-slug-start range-slider)  (+ med (* 20 mad)))
+    ))
 
 (defmethod float-value (v &optional (default 1.0))
   (declare (ignore v))
@@ -396,52 +343,82 @@
   (declare (ignore default))
   (float (read-from-string v)))
 
-#+:LISPWORKS4.2
 (defun get-image (data intf)
-  (handler-case
-      (multiple-value-bind (img attrs fname)
-          (scids:getvar :attrs '("exptime") :fast t)
-        (let* ((arr  (sa:make-variant-carray img))
-               (tint (float-value (first attrs)))
-               (ximg (make-image-x arr tint)))
-          (set-interface-image intf ximg) ;; (img:flipv ximg))
-          (set-window-title intf (namestring fname))
-          (set-slider-bounds intf ximg)
-          (refresh-image data intf)))
-    (scids:USER-CANCEL ())))
+  (with-actors
+    (um:with-remembered-filename (path "Select FITS File"
+                                       :photom nil ;; (um:remembered-filename :photom)
+                                       :filter "*.fit")
+      (multiple-value-bind (img hdr)
+          (extract-image path 0)
+        (let ((ximg (make-image-x img 10)))
+          (capi:execute-with-interface intf
+                                       (lambda ()
+                                         (set-window-title intf
+                                                           (let* ((fname (namestring path))
+                                                                  (pos   (position #\/ fname :from-end t)))
+                                                             (subseq fname (1+ pos))))
+                                         (set-interface-image intf ximg) ;; (img:flipv ximg))
+                                         (set-slider-bounds intf ximg)
+                                         (refresh-image data intf)))
+          )))))
 
-#-:LISPWORKS4.2
-(defun get-image (data intf)
-  (handler-case
-      (multiple-value-bind (img attrs fname)
-          (scids:getvar :attrs '("exptime"))
-        (let* ((arr  (ca:make-carray :float (array-dimensions img)))
-               (tint (float-value (first attrs)))
-               (ximg (make-image-x arr tint)))
-          (ca:copy-lisp-array-to-float-carray img arr)
-          (set-interface-image intf ximg) ;; (img:flipv ximg))
-          (set-window-title intf (namestring fname))
-          (set-slider-bounds intf ximg)
-          (refresh-image data intf)))
-    (scids:USER-CANCEL ())))
+(defvar *fits-segment-length* 2880)
+
+(defun extract-image (fname &optional (chan 0))
+  ;; Strip out the first G channel from the Bayer CFA (Seestar S50)
+  (let* ((data  (hcl:file-string fname)))
+    (multiple-value-bind (off hdr)
+        (um:nlet iter ((ix   0)
+                       (pos  0)
+                       (ans  nil))
+          (let* ((line (subseq data pos (+ pos 80))))
+            (if (string-equal "END     " (subseq line 0 8))
+                (values (* *fits-segment-length* (ceiling (+ pos 80) *fits-segment-length*))
+                        (nreverse ans))
+              (go-iter (1+ ix) (+ pos 80) (cons line ans))
+              )))
+      ;; (inspect hdr)
+      (let* ((wd   540)
+             (ht   540)
+             (dwd  1080)
+             (img  (make-array `(,ht ,wd)
+                               :element-type 'single-float))
+             (yoff (/ (- (/ 1920 2) ht) 2))
+             (xoff (/ (- (/ 1080 2) wd) 2)))
+        (loop for iy from 0 below ht do
+                (let* ((ypos  (+ off (* 2 2 dwd (+ yoff iy)))))
+                  (loop for ix from 0 below wd do
+                          (let* ((pos  (+ ypos
+                                          (* 2 chan)
+                                          (* 2 2 (+ xoff ix))))
+                                 (c1   (char data pos))
+                                 (c2   (char data (1+ pos))))
+                            (setf (aref img (- ht iy 1) ix) ;; vertical flip to match image viewers with (0,0) at top left
+                                  (float
+                                   (- (+ (ash (char-code c1) 8)
+                                         (char-code c2))
+                                      32768)))
+                            ))))
+        (values img hdr)
+        ))))
 
 (defvar *color-bar*
-  ;; allocate only once an use over and over again...
-  (let ((img (ca:make-carray :float '(256 9))))
+  ;; allocate only once and use over and over again...
+  (let ((img (make-array '(256 9) :element-type 'single-float)))
     (dotimes (iy 256)
       (dotimes (ix 9)
-        (setf (ca:caref img iy ix) (float iy))))
+        (setf (aref img iy ix) (float iy 1f0))))
     img))
 
 (defun redraw-color-bar (pane &rest args)
   (declare (ignore args))
-  (plt:direct-redraw pane))
+  (draw-color-bar (capi:element-interface pane)))
 
 (defun draw-color-bar (intf)
-  (let ((wpane (color-bar-display intf)))
-    (plt:wset wpane)
-    (let ((neg-img (capi:button-selected (neg-button intf))))
-      (plt:tvscl *color-bar* :neg neg-img))
+  (let ((wpane (color-bar-display intf))
+        (neg-img (capi:button-selected (neg-button intf))))
+    (with-actors
+      (plt:tvscl (color-bar-display intf) *color-bar* :neg neg-img))
     ))
 
 (defvar *magnification*  2)
@@ -452,23 +429,23 @@
         (range-pane      (range-slider intf))
         (negate-button   (neg-button intf))
         (logscale-button (logscale-button intf)))
-    (plt:window wpane)
-    (plt:clear  wpane)
+    ;; (plt:clear  wpane)
     (let* ((display-min (capi:range-slug-start offs-pane))
            (display-max (+ display-min
                            (capi:range-slug-start range-pane)))
            (neg-img     (capi:button-selected negate-button))
            (use-log     (capi:button-selected logscale-button)))
-      (if use-log
-          (show-log-stretch img
-                            display-min
-                            display-max
-                            neg-img)
-        (show-linear-stretch img
-                             display-min
-                             display-max
-                             neg-img)))
-    ))
+      (with-actors
+        (if use-log
+            (show-log-stretch intf img
+                              display-min
+                              display-max
+                              neg-img)
+          (show-linear-stretch intf img
+                               display-min
+                               display-max
+                               neg-img)))
+      )))
 
 (defmacro with-fast-unsafe-code (&body body)
   `(locally
@@ -477,7 +454,7 @@
                         (debug  0)))
      ,@body))
 
-(defun show-log-stretch (img minv maxv neg)
+(defun show-log-stretch (intf img minv maxv neg)
   (let* ((arr  (image-array-arena img))
          (minv (float minv))
          (maxv (float maxv))
@@ -486,25 +463,27 @@
                    (log (max 1.0 (- v minv))))
                ))
     (declare (type float minv maxv))
-    (ca:with-dynamic-carray (ximg :float
-                                  (ca:carray-dimensions arr))
-      (ca:with-row-major-access (pdst ximg)
-        (ca:with-row-major-access (psrc arr)
-          (dotimes (ix (ca:carray-total-size ximg))
-            (setf (fli:dereference pdst :index ix)
-                  (funcall fn (fli:dereference psrc :index ix))))
-          ))
-      (plt:tvscl ximg
-                :range (list 0 (funcall fn maxv))
-                :magn  *magnification*
-                :neg   neg))
+    (let ((ximg  (make-array (array-dimensions arr)
+                             :element-type 'single-float)))
+      (dotimes (ix (array-total-size ximg))
+        (setf (row-major-aref ximg ix)
+              (float (funcall fn (row-major-aref arr ix)) 1f0)))
+      (plt:tvscl (image-display intf)
+                 ximg
+                 :zrange (list 0 (funcall fn maxv))
+                 ;; :magn  *magnification*
+                 :neg   neg))
     ))
 
-(defun show-linear-stretch (img minv maxv neg)
-  (plt:tvscl (image-array-arena img)
-            :range (list minv maxv)
-            :magn  *magnification*
-            :neg   neg))
+(defun show-linear-stretch (intf img minv maxv neg)
+  (let ((med  (image-array-med img))
+        (mad  (image-array-mad img)))
+    (plt:tvscl (image-display intf)
+               (image-array-arena img)
+               :zrange  `(,(- med (* 5 mad))
+                          ,(+ med (* 20 mad)))
+               ;; :magn  *magnification*
+               :neg   neg)))
 
 (defun slider-refresh-image (slider val action)
   (when (eq action :move)
@@ -519,16 +498,16 @@
 
 (defun redisplay-image (pane &rest args)
   (declare (ignore args))
-  (plt:direct-redraw pane))
+  (capi:redisplay-element pane))
 
 (defvar *sub-image*
   ;; allocate once and use over and over again...
-  (ca:make-carray :float '(11 11)))
+  (make-array '(11 11) :element-type 'single-float))
 
 (um:defun* get-subimage-centered (arr (ctrx ctry))
   (destructuring-bind (dimy dimx)
-      (ca:carray-dimensions arr)
-    (let* ((minval (ca:caref arr ctry ctrx))
+      (array-dimensions arr)
+    (let* ((minval (aref arr ctry ctrx))
            (maxval minval))
       (declare (type float minval maxval))
       (if (and (< 4 ctry (- dimy 5))
@@ -537,11 +516,11 @@
                 and jy from 0 below 11 do
                 (loop for ix from (- ctrx 5) to (+ ctrx 5)
                       and jx from 0 below 11 do
-                      (let ((v (ca:caref arr iy ix)))
+                      (let ((v (aref arr iy ix)))
                         (declare (type float v))
                         (setf minval (min minval v)
                               maxval (max maxval v))
-                        (setf (ca:caref *sub-image* jy jx) v))))
+                        (setf (aref *sub-image* jy jx) v))))
         (let ((rpos -1)
               (rvec #.(make-array 121)))
           (loop for iy from (- ctry 5) to (+ ctry 5)
@@ -550,20 +529,20 @@
                       and jx from 0 below 11 do
                       (if (and (< -1 iy dimy)
                                (< -1 ix dimx))
-                          (let ((v (ca:caref arr iy ix)))
+                          (let ((v (aref arr iy ix)))
                             (declare (type float v))
                             (setf minval (min minval v)
                                   maxval (max maxval v))
-                            (setf (ca:caref *sub-image* jy jx) v))
+                            (setf (aref *sub-image* jy jx) v))
                         (let ((pos (+ jx (* 11 jy))))
                           (setf (aref rvec pos) rpos)
                           (setf rpos pos)))
                       ))
-          (ca:with-row-major-access (p *sub-image*)
+          (progn
             (do ((rpos rpos))
                 ((minusp rpos))
               (let ((rpos2 (aref rvec rpos)))
-                (setf (fli:dereference p :index rpos) minval)
+                (setf (row-major-aref *sub-image* rpos) minval)
                 (setf rpos rpos2))
               ))
           ))
@@ -577,18 +556,17 @@
 	 (neg-img     (capi:button-selected negate-button)))
     (multiple-value-bind (ximg minval maxval)
         (get-subimage-centered arr (list y x))
-      (plt:wset pane)
-      (plt:tvscl ximg
-                :magn  8
+      (plt:tvscl (magn-image-display intf) ximg
+                ;; :magn  8
                 :range (list minval
-                             (max (ca:caref ximg 5 5) ;; pick out ctr pixel
+                             (max (aref ximg 5 5) ;; pick out ctr pixel
                                   (+ 100 (/ (+ minval maxval) 2)))) ;; + med 100)))
                 :neg   neg-img)
       )))
 
 (defun draw-magn-frame-fiducials (pane x y width height)
   (declare (ignore x y width height))
-  (plt:direct-redraw pane)
+  (capi:redisplay-element pane)
   (gp:with-graphics-state (pane :operation boole-1
                                 :foreground :red)
     (gp:draw-line pane 0 43 38 43)
@@ -615,7 +593,7 @@
 
 (defun compute-moat-median (img ctry ctrx)
   (let ((arr (image-array-arena img)))
-    (destructuring-bind (dimy dimx) (ca:carray-dimensions arr)
+    (destructuring-bind (dimy dimx) (array-dimensions arr)
       (let* ((moat (let ((cnt 0))
                      (if (and (< 19 ctry (- dimy 20))
                               (< 19 ctrx (- dimx 20)))
@@ -623,7 +601,7 @@
                                (let ((ypos (+ iy ctry))
                                      (xpos (+ ix ctrx)))
                                  (setf (aref *moat* cnt)
-                                       (ca:caref arr ypos xpos))
+                                       (aref arr ypos xpos))
                                  (incf cnt)))
                        (loop for (iy ix) in *wmask* do
                              (let ((ypos (+ iy ctry))
@@ -631,7 +609,7 @@
                                (when (and (< -1 ypos dimy)
                                           (< -1 xpos dimx))
                                  (setf (aref *moat* cnt)
-                                       (ca:caref arr ypos xpos))
+                                       (aref arr ypos xpos))
                                  (incf cnt))
                                )))
                      (make-array cnt
@@ -643,13 +621,13 @@
                              (< 4 ctrx (- dimx 5)))
                         (loop for iy from (- ctry 5) to (+ ctry 5) do
                               (loop for ix from (- ctrx 5) to (+ ctrx 5) do
-                                    (incf tot (max 0 (- (ca:caref arr iy ix) med)))
+                                    (incf tot (max 0 (- (aref arr iy ix) med)))
                                     ))
                       (loop for iy from (- ctry 5) to (+ ctry 5) do
                             (loop for ix from (- ctrx 5) to (+ ctrx 5) do
                                   (when (and (< -1 iy dimy)
                                              (< -1 ix dimx))
-                                    (incf tot (max 0 (- (ca:caref arr iy ix) med))))
+                                    (incf tot (max 0 (- (aref arr iy ix) med))))
                                   )))
                     tot)))
         (values med tot))
@@ -736,8 +714,8 @@
          (img  (interface-image intf)))
     (when img
       (let* ((a     (image-array-arena img))
-             (xlim  (1- (ca:carray-dimension a 1)))
-             (ylim  (1- (ca:carray-dimension a 0))))
+             (xlim  (1- (array-dimension a 1)))
+             (ylim  (1- (array-dimension a 0))))
         (multiple-value-bind (x y) (cvt-display-to-image-coords img x y)
           (set-x-display intf x)
           (set-y-display intf y)
@@ -746,13 +724,14 @@
                    (>= y 0)
                    (<= y ylim))
               (progn
-                (set-z-display intf (ca:caref a y x))
+                (set-z-display intf (aref a y x))
                 (set-m-display intf (compute-magnitude x y img intf)))
             (progn
               (clear-z-display intf)
               (clear-m-display intf)))
           )))))
 
+#+:WIN32
 (defun adjust-cursor (dx dy)
   (fli:with-dynamic-foreign-objects ()
     (let ((pos (fli:allocate-dynamic-foreign-object
@@ -761,6 +740,19 @@
       (win32:get-cursor-pos pos)
       (win32:set-cursor-pos (+ dx (fli:dereference pos :index 0))
                             (+ dy (fli:dereference pos :index 1)))
+      )))
+
+#-:WIN32
+(defun adjust-cursor (dx dy)
+  (fli:with-dynamic-foreign-objects ()
+    (let ((pos (fli:allocate-dynamic-foreign-object
+                :type :int
+                :nelems 2)))
+      #|
+      (win32:get-cursor-pos pos)
+      (win32:set-cursor-pos (+ dx (fli:dereference pos :index 0))
+                            (+ dy (fli:dereference pos :index 1)))
+      |#
       )))
 
 (labels

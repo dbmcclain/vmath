@@ -1,5 +1,5 @@
 
-(in-package #:roots)
+(in-package #:com.ral.roots)
 
 ;; ----------------------------------------------------------
 ;; Bracket a root given two starting values
@@ -289,6 +289,7 @@
                            ))
                      
                    (setf fb (um:dfloat (funcall func b)))
+                   (print (list iter b (um:nfmt fb)))
                    )))
               )))
     ))
