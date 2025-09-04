@@ -27,12 +27,14 @@
                     (make-array (length ys)
                                 :initial-element wts)
                   wts))
-         (nel   (length xs))
-         (dof   (- nel 2)))
+         ;; (nel   (length xs))
+         ;; (dof   (- nel 2))
+         )
     (um:nlet iter ((swts    wts)
                    (sigprev nil)
                    (niter   0))
       (let* ((twt    (matrix:sum swts))
+             (neff   (/ (* twt twt) (matrix:<*> swts swts)))
              (xmn    (/ (matrix:<*> xs swts) twt))
              (xsmrm  (matrix:- xs xmn))
              (ywmn   (/ (matrix:<*> ys swts) twt))
@@ -41,7 +43,7 @@
                         (matrix:<*> xsmrm xsmrm swts)))
              (devs   (matrix:- ysmrm (matrix:* slope xsmrm)))
              (wsigma (sqrt (/ (matrix:<*> swts devs devs)
-                              twt (/ dof nel)))))
+                              twt (/ (- neff 2) neff)))))
         (if (and (< niter 100)
                  (plusp wsigma)
                  (or (null sigprev)
@@ -54,7 +56,7 @@
           ;; else
           (progn
             (format t "~%linfit:regression niter = ~A" niter)
-            (values xmn ywmn slope wsigma niter) ))))))
+            (values xmn ywmn slope wsigma niter neff (/ wsigma (sqrt neff)) ) ))))))
   
 
 (defun regress-fixed-slope (xs ys wts slope &key (alpha 2) (beta 2) (eps 1d-3))
